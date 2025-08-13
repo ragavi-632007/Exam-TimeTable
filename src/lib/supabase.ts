@@ -81,6 +81,7 @@ export interface Database {
           name: string;
           department: string;
           year: number;
+          sem: number; // Using 'sem' as the field name
           created_at: string;
           updated_at: string;
           is_shared: boolean;
@@ -92,6 +93,7 @@ export interface Database {
           name: string;
           department: string;
           year: number;
+          sem: number;
           created_at?: string;
           updated_at?: string;
           is_shared?: boolean;
@@ -103,6 +105,7 @@ export interface Database {
           name?: string;
           department?: string;
           year?: number;
+          sem?: number;
           created_at?: string;
           updated_at?: string;
           is_shared?: boolean;

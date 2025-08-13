@@ -696,9 +696,14 @@ export const examService = {
       department: schedule.departments?.name || "Unknown",
       scheduledDate: schedule.exam_date,
       examDate: schedule.exam_date,
+      examType: schedule.exam_type,
       status: "scheduled",
       year: schedule.subject_detail?.year || 2,
-      semester: 8,
+      // Prefer 'sem' if present, else 'semester' field, else undefined
+      semester:
+        schedule.subject_detail?.sem ??
+        schedule.subject_detail?.semester ??
+        undefined,
       courseId: schedule.subject_detail?.subcode || "Unknown",
       teacherId: schedule.assigned_by,
       teacherName: "Unknown",

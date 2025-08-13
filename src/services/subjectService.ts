@@ -6,6 +6,7 @@ export interface Subject {
   name: string;
   department: string;
   year: number;
+  sem: number; // Using 'sem' as the field name from database
   created_at: string;
   updated_at: string;
   is_shared: boolean;
@@ -63,6 +64,39 @@ export const subjectService = {
 
     if (error) {
       console.error('Error fetching subjects by year:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  },
+
+  // Get subjects by semester
+  async getSubjectsBySemester(semester: number): Promise<Subject[]> {
+    const { data, error } = await supabase
+      .from('subject_detail')
+      .select('*')
+      .eq('sem', semester)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching subjects by semester:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  },
+
+  // Get subjects by year and semester
+  async getSubjectsByYearAndSemester(year: number, semester: number): Promise<Subject[]> {
+    const { data, error } = await supabase
+      .from('subject_detail')
+      .select('*')
+      .eq('year', year)
+      .eq('sem', semester)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching subjects by year and semester:', error);
       throw new Error(error.message);
     }
 

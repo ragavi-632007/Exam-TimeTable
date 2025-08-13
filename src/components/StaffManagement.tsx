@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Mail, Phone, Loader2 } from 'lucide-react';
+import { Search, Trash2, Mail, Phone, Loader2 } from 'lucide-react';
 import { staffService, StaffMember } from '../services/staffService';
 import { departmentService, Department } from '../services/departmentService';
 
@@ -55,10 +55,7 @@ export const StaffManagement: React.FC = () => {
       : 'bg-blue-100 text-blue-800';
   };
 
-  const handleEdit = async (id: string) => {
-    // TODO: Implement edit functionality with modal/form
-    console.log('Edit staff member:', id);
-  };
+  // Edit functionality removed
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this staff member?')) {
@@ -74,10 +71,7 @@ export const StaffManagement: React.FC = () => {
     }
   };
 
-  const handleAddStaff = () => {
-    // TODO: Implement add staff functionality with modal/form
-    console.log('Add new staff member');
-  };
+  // Add staff functionality removed per requirements
 
   const refreshData = async () => {
     try {
@@ -112,13 +106,6 @@ export const StaffManagement: React.FC = () => {
           >
             <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
-          </button>
-          <button
-            onClick={handleAddStaff}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Staff</span>
           </button>
         </div>
       </div>
@@ -230,12 +217,6 @@ export const StaffManagement: React.FC = () => {
                        </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEdit(staff.id)}
-                            className="text-blue-600 hover:text-blue-900 transition-colors"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
                           <button
                             onClick={() => handleDelete(staff.id)}
                             className="text-red-600 hover:text-red-900 transition-colors"

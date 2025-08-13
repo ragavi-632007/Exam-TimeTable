@@ -28,6 +28,7 @@ CREATE TABLE subject_detail (
     name VARCHAR(255) NOT NULL,
     department VARCHAR(255) NOT NULL,
     year INTEGER NOT NULL,
+    semester INTEGER NOT NULL DEFAULT 1,
     is_shared BOOLEAN DEFAULT false,
     shared_subject_code VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

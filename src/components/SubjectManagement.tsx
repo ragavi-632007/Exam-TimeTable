@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Trash2, Calendar, AlertCircle, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import { subjectService, Subject } from '../services/subjectService';
 import { examService } from '../services/examService';
 
@@ -14,10 +14,52 @@ export const SubjectManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'pending'>('all');
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
+  const [selectedSemester, setSelectedSemester] = useState<number | 'all'>('all');
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
+
+  // Get unique years and semesters from subjects
+  const uniqueYears = [...new Set(subjects.map(s => s.year))].sort();
+  const uniqueSemesters = [...new Set(subjects.map(s => s.sem))].sort();
+  
+  // Allowed semesters depend on selected year
+  const allowedSemesters: number[] =
+    selectedYear === 2
+      ? [3, 4]
+      : selectedYear === 3
+      ? [5, 6]
+      : uniqueSemesters;
 
   useEffect(() => {
     loadSubjects();
   }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showYearDropdown || showSemesterDropdown) {
+        const target = event.target as Element;
+        if (!target.closest('.dropdown-container')) {
+          setShowYearDropdown(false);
+          setShowSemesterDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showYearDropdown, showSemesterDropdown]);
+
+  // Ensure semester selection stays valid when year changes
+  useEffect(() => {
+    if (selectedSemester !== 'all' && !allowedSemesters.includes(selectedSemester)) {
+      setSelectedSemester('all');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
 
   const loadSubjects = async () => {
     try {
@@ -68,7 +110,28 @@ export const SubjectManagement: React.FC = () => {
       (filterStatus === 'scheduled' && subject.isScheduled) ||
       (filterStatus === 'pending' && !subject.isScheduled);
     
-    return matchesSearch && matchesFilter;
+    const matchesYear = selectedYear === 'all' || subject.year === selectedYear;
+    const matchesSemester = selectedSemester === 'all'
+      ? (selectedYear === 2
+          ? [3, 4].includes(subject.sem)
+          : selectedYear === 3
+          ? [5, 6].includes(subject.sem)
+          : true)
+      : subject.sem === selectedSemester;
+    
+    // Debug logging
+    if (selectedYear !== 'all' || selectedSemester !== 'all') {
+      console.log('Filtering subject:', subject.name, {
+        year: subject.year,
+        selectedYear,
+        semester: subject.sem,
+        selectedSemester,
+        matchesYear,
+        matchesSemester
+      });
+    }
+    
+    return matchesSearch && matchesFilter && matchesYear && matchesSemester;
   });
 
   const getStatusIcon = (isScheduled: boolean) => {
@@ -95,10 +158,7 @@ export const SubjectManagement: React.FC = () => {
     );
   };
 
-  const handleEdit = async (id: string) => {
-    // TODO: Implement edit functionality with modal/form
-    console.log('Edit subject:', id);
-  };
+  // Edit functionality removed
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this subject?')) {
@@ -112,10 +172,7 @@ export const SubjectManagement: React.FC = () => {
     }
   };
 
-  const handleAddSubject = () => {
-    // TODO: Implement add subject functionality with modal/form
-    console.log('Add new subject');
-  };
+  // Add subject functionality removed per requirements
 
   const refreshData = async () => {
     await loadSubjects();
@@ -126,6 +183,32 @@ export const SubjectManagement: React.FC = () => {
     scheduled: subjects.filter(s => s.isScheduled).length,
     pending: subjects.filter(s => !s.isScheduled).length
   };
+
+  // Update stats based on current filters (excluding text search)
+  const getFilteredStats = () => {
+    const yearFiltered = subjects.filter(s => 
+      selectedYear === 'all' || s.year === selectedYear
+    );
+    const semesterFiltered = yearFiltered.filter(s => {
+      if (selectedSemester === 'all') {
+        if (selectedYear === 2) return [3, 4].includes(s.sem);
+        if (selectedYear === 3) return [5, 6].includes(s.sem);
+        return true;
+      }
+      return s.sem === selectedSemester;
+    });
+    const totalYearSem = semesterFiltered.length;
+    const scheduled = semesterFiltered.filter(s => s.isScheduled).length;
+    const pending = totalYearSem - scheduled;
+    return {
+      total: subjects.length,
+      totalYearSem,
+      scheduled,
+      pending
+    };
+  };
+
+  const currentStats = getFilteredStats();
 
   if (loading) {
     return (
@@ -146,17 +229,10 @@ export const SubjectManagement: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">Subject Management</h2>
           <p className="text-sm text-gray-600">Manage subjects and view their scheduling status</p>
         </div>
-        <button
-          onClick={handleAddSubject}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Subject</span>
-        </button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -164,7 +240,7 @@ export const SubjectManagement: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Subjects</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-2xl font-bold text-gray-900">{currentStats.totalYearSem}</p>
             </div>
           </div>
         </div>
@@ -175,7 +251,7 @@ export const SubjectManagement: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Scheduled</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.scheduled}</p>
+              <p className="text-2xl font-bold text-gray-900">{currentStats.scheduled}</p>
             </div>
           </div>
         </div>
@@ -186,14 +262,52 @@ export const SubjectManagement: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+              <p className="text-2xl font-bold text-gray-900">{currentStats.pending}</p>
             </div>
           </div>
         </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Search className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Visible Results</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredSubjects.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Filter Summary */}
+        {(selectedYear !== 'all' || selectedSemester !== 'all') && (
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <span>Showing results for:</span>
+            {selectedYear !== 'all' && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Year {selectedYear}
+              </span>
+            )}
+            {selectedSemester !== 'all' && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Semester {selectedSemester}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setSelectedYear('all');
+                setSelectedSemester('all');
+              }}
+              className="text-blue-600 hover:text-blue-800 underline text-xs"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col gap-4">
+        {/* Search Bar */}
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
@@ -206,37 +320,114 @@ export const SubjectManagement: React.FC = () => {
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All ({stats.total})
-          </button>
-          <button
-            onClick={() => setFilterStatus('scheduled')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === 'scheduled'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Scheduled ({stats.scheduled})
-          </button>
-          <button
-            onClick={() => setFilterStatus('pending')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === 'pending'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Pending ({stats.pending})
-          </button>
+        
+        {/* Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Year Dropdown */}
+          <div className="relative dropdown-container">
+            <button
+              onClick={() => setShowYearDropdown(!showYearDropdown)}
+              className="flex items-center justify-between w-40 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <span>{selectedYear === 'all' ? 'All Years' : `Year ${selectedYear}`}</span>
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </button>
+            {showYearDropdown && (
+              <div className="absolute z-10 w-40 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                <button
+                  onClick={() => {
+                    setSelectedYear('all');
+                    setShowYearDropdown(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                >
+                  All Years
+                </button>
+                {uniqueYears.map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setShowYearDropdown(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    Year {year}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Semester Dropdown */}
+          <div className="relative dropdown-container">
+            <button
+              onClick={() => setShowSemesterDropdown(!showSemesterDropdown)}
+              className="flex items-center justify-between w-40 px-2 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <span>{selectedSemester === 'all' ? 'All Semesters' : `Semester ${selectedSemester}`}</span>
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </button>
+            {showSemesterDropdown && (
+              <div className="absolute z-10 w-40 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                <button
+                  onClick={() => {
+                    setSelectedSemester('all');
+                    setShowSemesterDropdown(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                >
+                  All Semesters
+                </button>
+                {allowedSemesters.map((semester) => (
+                  <button
+                    key={semester}
+                    onClick={() => {
+                      setSelectedSemester(semester);
+                      setShowSemesterDropdown(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    Semester {semester}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Status Filter Buttons */}
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilterStatus('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterStatus === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              All ({currentStats.totalYearSem})
+            </button>
+            <button
+              onClick={() => setFilterStatus('scheduled')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterStatus === 'scheduled'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Scheduled ({currentStats.scheduled})
+            </button>
+            <button
+              onClick={() => setFilterStatus('pending')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterStatus === 'pending'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Pending ({currentStats.pending})
+            </button>
+          </div>
         </div>
       </div>
 
@@ -254,6 +445,9 @@ export const SubjectManagement: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   YEAR
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  SEMESTER
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   STATUS
@@ -280,6 +474,9 @@ export const SubjectManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">Year {subject.year}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">Semester {subject.sem}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(subject.isScheduled)}
@@ -309,12 +506,6 @@ export const SubjectManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(subject.id)}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
                       <button
                         onClick={() => handleDelete(subject.id)}
                         className="text-red-600 hover:text-red-900 transition-colors"

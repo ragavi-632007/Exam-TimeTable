@@ -29,6 +29,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
 }) => {
   const [generating, setGenerating] = useState(false);
   const [selectedYear, setSelectedYear] = useState("2");
+  const [selectedSemester, setSelectedSemester] = useState<string>("");
   const [selectedExam, setSelectedExam] = useState("IA2");
   const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   const [departments, setDepartments] = useState(defaultDepartments);
@@ -39,10 +40,13 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     const dates: Date[] = scheduledExams
       .filter((exam) => {
         const matchesYear = String(exam.year) === selectedYear;
+        const matchesSem = selectedSemester
+          ? String(exam.semester ?? exam.sem ?? "") === selectedSemester
+          : true;
         const type = exam.examType || exam.exam_type; // support both keys
         const matchesType = type ? type === selectedExam : true; // if missing, don't filter out
         const hasDate = Boolean(exam.scheduledDate || exam.examDate);
-        return matchesYear && matchesType && hasDate;
+        return matchesYear && matchesSem && hasDate;
       })
       .map((exam) => new Date((exam.scheduledDate || exam.examDate) as string))
       .filter((d) => !isNaN(d.getTime()));
@@ -50,7 +54,20 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     if (dates.length === 0) return null;
     dates.sort((a, b) => a.getTime() - b.getTime());
     return dates[0];
-  }, [scheduledExams, selectedYear, selectedExam]);
+  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
+
+  // Derive filtered exams for preview table visibility
+  const filteredPreviewExams = useMemo(() => {
+    return scheduledExams.filter((exam) => {
+      const matchesYear = String(exam.year) === selectedYear;
+      const matchesSem = selectedSemester
+        ? String(exam.semester ?? exam.sem ?? "") === selectedSemester
+        : true;
+      const type = exam.examType || exam.exam_type;
+      const matchesType = type ? type === selectedExam : true;
+      return matchesYear && matchesSem && matchesType;
+    });
+  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
 
   // Load scheduled exams and departments
   useEffect(() => {
@@ -399,6 +416,31 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Semester
+                  </label>
+                  <select
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Semesters</option>
+                    {selectedYear === "2" && (
+                      <>
+                        <option value="3">Semester 3</option>
+                        <option value="4">Semester 4</option>
+                      </>
+                    )}
+                    {selectedYear === "3" && (
+                      <>
+                        <option value="5">Semester 5</option>
+                        <option value="6">Semester 6</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Examination Type
                   </label>
                   <select
@@ -433,7 +475,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
               </div>
 
               {/* Dynamic Scheduled Exams Table Preview */}
-              {scheduledExams.length > 0 && (
+              {filteredPreviewExams.length > 0 ? (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-start mb-1">
                     <Calendar className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
@@ -519,8 +561,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                     </table>
                   </div>
                 </div>
-              )}
-              {scheduledExams.length === 0 && (
+              ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-start">
                     <Calendar className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
@@ -529,8 +570,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                         No Scheduled Exams
                       </h5>
                       <p className="text-sm text-yellow-700 mt-1">
-                        No exams have been scheduled yet. Teachers can schedule
-                        exams from their dashboard.
+                        No exams have been scheduled for the selected Year/Semester and Examination Type.
                       </p>
                     </div>
                   </div>
