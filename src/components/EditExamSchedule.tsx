@@ -30,19 +30,24 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
     setError(null);
 
     try {
-      // Update the exam schedule
+      // Update the exam schedule (swap logic handled in service)
       await examService.updateExamSchedule(schedule.id, {
         exam_date: formData.examDate,
         exam_type: formData.examType,
         room: formData.room,
         notes: formData.notes
       });
-
+      setError(null);
       onUpdate();
       onClose();
     } catch (error: any) {
+      // If swap occurred, show a message
+      if (error.message && error.message.includes('swap')) {
+        setError('Exam date was swapped with another subject scheduled on the same date.');
+      } else {
+        setError(error.message || 'Failed to update exam schedule');
+      }
       console.error('Failed to update exam schedule:', error);
-      setError(error.message || 'Failed to update exam schedule');
     } finally {
       setLoading(false);
     }

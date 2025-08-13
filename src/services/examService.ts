@@ -774,17 +774,56 @@ export const examService = {
   // Update exam schedule
   async updateExamSchedule(scheduleId: string, updates: any): Promise<void> {
     const updateData: any = {};
-
     if (updates.exam_date) updateData.exam_date = updates.exam_date;
     if (updates.exam_type) updateData.exam_type = updates.exam_type;
     if (updates.room) updateData.room = updates.room;
     if (updates.notes) updateData.notes = updates.notes;
 
+    // Check for conflict: is there another exam scheduled for the new date?
+    if (updates.exam_date) {
+      // Get current exam's department to check for conflicts within same department
+      const { data: currentExam, error: currentError } = await supabase
+        .from("exam_schedules")
+        .select("exam_date, department_id")
+        .eq("id", scheduleId)
+        .single();
+
+      if (currentError) {
+        throw new Error(currentError.message);
+      }
+
+      // Check for conflicts on the new date within the same department
+      const { data: conflictExams, error: conflictError } = await supabase
+        .from("exam_schedules")
+        .select("id, exam_date")
+        .eq("exam_date", updates.exam_date)
+        .eq("department_id", currentExam.department_id)
+        .neq("id", scheduleId);
+
+      if (conflictError) {
+        throw new Error(conflictError.message);
+      }
+
+      if (conflictExams && conflictExams.length > 0) {
+        // Found a conflict in the same department, perform the swap
+        const conflictExam = conflictExams[0]; // Take the first conflict if multiple exist
+
+        // Update the conflicting exam to take the current exam's date
+        const { error: swapError } = await supabase
+          .from("exam_schedules")
+          .update({ exam_date: currentExam.exam_date })
+          .eq("id", conflictExam.id);
+
+        if (swapError) {
+          throw new Error(swapError.message);
+        }
+      }
+    }
+
     const { error } = await supabase
       .from("exam_schedules")
       .update(updateData)
       .eq("id", scheduleId);
-
     if (error) {
       throw new Error(error.message);
     }
