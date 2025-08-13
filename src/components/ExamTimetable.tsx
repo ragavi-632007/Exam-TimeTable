@@ -302,7 +302,7 @@ export const ExamTimetable: React.FC = () => {
       </div>
 
       {/* Print Styles */}
-      <style jsx>{`
+      <style>{`
         @media print {
           body { 
             margin: 0; 

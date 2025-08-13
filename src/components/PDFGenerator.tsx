@@ -211,12 +211,12 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         minExamDate && !isNaN((minExamDate as Date).getTime())
           ? (minExamDate as Date).toLocaleDateString("en-GB")
           : "____";
-      const circularText = `The ${examName} Exam for ${yearText} students starts from ${startDateStr} onwards. All the students are hereby informing to take the exams\nseriously.\nThe marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
+      const circularText = `The ${examName} Exam for ${yearText} students starts from ${startDateStr} onwards. All the students are hereby informed to take the exams seriously. The marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
       const lines = pdf.splitTextToSize(circularText, pageWidth - 40);
       pdf.text(lines, 12, y + 56);
 
       // Dynamic Table
-      const tableY = y + 70;
+      const tableY = y + 65;
       const tableX = 12;
       const tableWidth = pageWidth - 24;
       // Dynamic department codes for headers (sorted by code)
@@ -269,6 +269,23 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       let rowY = tableY + 10;
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
+      // Find all common subject names for each date (appearing in more than one department)
+      const commonSubjectsByDate: Record<string, Set<string>> = {};
+      for (const date of sortedDates) {
+        const examsForDate = Object.values(
+          scheduleMap.get(date) || {}
+        ) as any[];
+        const nameCount: Record<string, number> = {};
+        examsForDate.forEach((exam: any) => {
+          if (!exam || !exam.subjectName) return;
+          nameCount[exam.subjectName] = (nameCount[exam.subjectName] || 0) + 1;
+        });
+        commonSubjectsByDate[date] = new Set(
+          Object.entries(nameCount)
+            .filter(([_, count]) => (count as number) > 1)
+            .map(([name]) => name)
+        );
+      }
       for (const date of sortedDates) {
         colX = tableX;
         pdf.rect(colX, rowY, colWidths[0], 10);
@@ -281,8 +298,16 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
           if (exam) {
             const code = exam.subjectCode || "-";
             const name = exam.subjectName || "-";
-            pdf.text(code, colX + 2, rowY + 4);
-            pdf.text(name, colX + 2, rowY + 8);
+            // If this subject name is common for this date, make it bold
+            if (commonSubjectsByDate[date].has(name)) {
+              pdf.setFont("helvetica", "bold");
+              pdf.text(code, colX + 2, rowY + 4);
+              pdf.text(name, colX + 2, rowY + 8);
+              pdf.setFont("helvetica", "normal");
+            } else {
+              pdf.text(code, colX + 2, rowY + 4);
+              pdf.text(name, colX + 2, rowY + 8);
+            }
           } else {
             pdf.text("-", colX + 2, rowY + 7);
           }
@@ -309,7 +334,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       );
 
       // Copy To
-      const copyY = notesY + 30;
+      const copyY = notesY + 25;
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.text("Copy To:", tableX, copyY);
@@ -320,21 +345,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       pdf.text(copyLine, tableX + 22, copyY);
 
       // Signature block (only 'PRINCIPAL')
-      const sigY = copyY + 30;
+      const sigY = copyY + 5;
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(11);
       pdf.text("PRINCIPAL", pageWidth - 40, sigY);
-
-      // Footer
-      const footerY = pageHeight - 20;
-      pdf.setFontSize(8);
-      pdf.setTextColor(128, 128, 128);
-      pdf.text(
-        "Generated on: " + new Date().toLocaleString("en-GB"),
-        pageWidth / 2,
-        footerY,
-        { align: "center" }
-      );
 
       // Save the PDF
       pdf.save("CIT_Exam_Circular.pdf");
@@ -428,7 +442,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                     </h5>
                   </div>
                   <p className="text-xs text-gray-700 mb-3">
-                    Start date: {firstPreviewDate ? firstPreviewDate.toLocaleDateString("en-GB") : "-"}
+                    Start date:{" "}
+                    {firstPreviewDate
+                      ? firstPreviewDate.toLocaleDateString("en-GB")
+                      : "-"}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-xs border border-green-200 rounded-lg">
