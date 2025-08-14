@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { subjectService, Subject } from "../services/subjectService";
 import { useAuth } from "../context/AuthContext";
 import { useExams } from "../context/ExamContext";
 import { ExamAlert } from "../types";
@@ -24,6 +25,23 @@ import { SubjectManagement } from "./SubjectManagement";
 import { examService } from "../services/examService";
 
 export const AdminDashboard: React.FC = () => {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [alerts, setAlerts] = useState<ExamAlert[]>([]);
+  // Separate alerts by year (must be after alerts state is defined)
+  const alertsYear2 = alerts.filter((a) => a.year === 2);
+  const alertsYear3 = alerts.filter((a) => a.year === 3);
+  // Fetch all subjects on mount
+  React.useEffect(() => {
+    const fetchSubjects = async () => {
+      try {
+        const allSubjects = await subjectService.getAllSubjects();
+        setSubjects(allSubjects);
+      } catch (err) {
+        console.error("Failed to fetch subjects:", err);
+      }
+    };
+    fetchSubjects();
+  }, []);
   const { user, logout } = useAuth();
   const { exams } = useExams();
   const [activeTab, setActiveTab] = useState<
@@ -33,7 +51,6 @@ export const AdminDashboard: React.FC = () => {
   const [editingAlert, setEditingAlert] = useState<ExamAlert | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
 
-  const [alerts, setAlerts] = useState<ExamAlert[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Fetch alerts from DB on mount
@@ -81,6 +98,10 @@ export const AdminDashboard: React.FC = () => {
       console.error("Error refreshing schedule data:", error);
     }
   };
+
+  // Helper functions to filter exams by year
+  const examsYear2 = exams.filter((exam) => exam.year === 2);
+  const examsYear3 = exams.filter((exam) => exam.year === 3);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -262,7 +283,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
         {/* Main Content Area */}
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 p-2 md:p-6 max-w-7xl mx-auto w-full">
           {/* Dashboard Tab */}
           {activeTab === "dashboard" && (
             <div className="space-y-6">
@@ -281,135 +302,227 @@ export const AdminDashboard: React.FC = () => {
                       System
                     </p>
                   </div>
-                 
                 </div>
               </div>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                {[
-                  {
-                    label: "Total Exam Alerts",
-                    value: alerts.length.toString(),
-                    icon: AlertTriangle,
-                    color: "text-blue-600 bg-blue-100",
-                    progress: 25,
-                  },
-                  {
-                    label: "Scheduled Exams",
-                    value: exams
-                      .filter((exam) => exam.status === "scheduled")
-                      .length.toString(),
-                    icon: FileText,
-                    color: "text-green-600 bg-green-100",
-                    progress: Math.min(
-                      exams.filter((exam) => exam.status === "scheduled")
-                        .length * 10,
-                      100
-                    ),
-                  },
-                  {
-                    label: "Active Alerts",
-                    value: alerts
-                      .filter((a) => a.status === "active")
-                      .length.toString(),
-                    icon: FileText,
-                    color: "text-orange-600 bg-orange-100",
-                    progress: 25,
-                  },
-                  {
-                    label: "Completion Rate",
-                    value:
-                      exams.length > 0
-                        ? `${Math.round(
-                            (exams.filter((exam) => exam.status === "scheduled")
-                              .length /
-                              exams.length) *
-                              100
-                          )}%`
-                        : "0%",
-                    icon: FileText,
-                    color: "text-purple-600 bg-purple-100",
-                    progress:
-                      exams.length > 0
-                        ? Math.min(
-                            (exams.filter((exam) => exam.status === "scheduled")
-                              .length /
-                              exams.length) *
-                              100,
-                            100
-                          )
-                        : 0,
-                  },
-                ].map((stat, index) => (
-                  <div
-                    key={index}
-                    className="bg-white rounded-lg shadow-sm p-6"
-                  >
+              {/* Stats Cards for Year 2 and Year 3, Alerts, and Subjects */}
+              {/* Year 2 Stats */}
+              <div className="mb-8 w-full">
+                <h2 className="text-lg font-semibold mb-2 text-black">
+                  Year 2 Statistics
+                </h2>
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Scheduled Exams */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div className={`p-3 rounded-lg ${stat.color}`}>
-                        <stat.icon className="h-6 w-6" />
+                      <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                        <FileText className="h-6 w-6" />
                       </div>
                     </div>
                     <div className="mb-2">
                       <p className="text-3xl font-bold text-gray-900">
-                        {stat.value}
+                        {
+                          examsYear2.filter(
+                            (exam) => exam.status === "scheduled"
+                          ).length
+                        }
                       </p>
-                      <p className="text-sm text-gray-600">{stat.label}</p>
+                      <p className="text-sm text-gray-600">Scheduled Exams</p>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${stat.progress}%` }}
+                        style={{
+                          width: `${Math.min(
+                            examsYear2.filter(
+                              (exam) => exam.status === "scheduled"
+                            ).length * 10,
+                            100
+                          )}%`,
+                        }}
                       ></div>
                     </div>
                   </div>
-                ))}
-              </div>
-              {/* Content Sections */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 mt-6">
-                {/* Department Overview */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Building className="h-5 w-5 text-gray-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Department Overview
-                    </h3>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Examination status across all departments
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3">
-                    {[
-                      "CSE",
-                      "ECE",
-                      "EEE",
-                      "MECH",
-                      "IT",
-                      "AIDS",
-                      "AIML",
-                      "CSBS",
-                      "CYBER",
-                      "VLSI",
-                      "ACT",
-                      "MCT",
-                      "BME",
-                    ].map((dept: string) => (
-                      <div
-                        key={dept}
-                        className="bg-blue-50 rounded-lg p-6 text-center text-base"
-                      >
-                        <p className="text-sm font-medium text-blue-900">
-                          {dept}
-                        </p>
-                        <p className="text-xs text-blue-700">Department</p>
-                        <p className="text-xs text-green-600 font-medium">
-                          ✓ Active
-                        </p>
+                  {/* Completion Rate */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                        <FileText className="h-6 w-6" />
                       </div>
-                    ))}
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear2.length > 0
+                          ? `${Math.round(
+                              (examsYear2.filter(
+                                (exam) => exam.status === "scheduled"
+                              ).length /
+                                examsYear2.length) *
+                                100
+                            )}%`
+                          : "0%"}
+                      </p>
+                      <p className="text-sm text-gray-600">Completion Rate</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            examsYear2.length > 0
+                              ? Math.min(
+                                  (examsYear2.filter(
+                                    (exam) => exam.status === "scheduled"
+                                  ).length /
+                                    examsYear2.length) *
+                                    100,
+                                  100
+                                )
+                              : 0
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Alerts Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {alertsYear2.length}
+                      </p>
+                      <p className="text-sm text-gray-600">Total Alerts</p>
+                    </div>
+                  </div>
+                  {/* Subjects Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                        <Users className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {subjects.filter((s) => s.year === 2).length}
+                      </p>
+                      <p className="text-sm text-gray-600">Total Subjects</p>
+                    </div>
                   </div>
                 </div>
               </div>
+              {/* Year 3 Stats */}
+              <div className="w-full">
+                <h2 className="text-lg font-semibold mb-2 text-black">
+                  Year 3 Statistics
+                </h2>
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Scheduled Exams */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {
+                          examsYear3.filter(
+                            (exam) => exam.status === "scheduled"
+                          ).length
+                        }
+                      </p>
+                      <p className="text-sm text-gray-600">Scheduled Exams</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            examsYear3.filter(
+                              (exam) => exam.status === "scheduled"
+                            ).length * 10,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Completion Rate */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear3.length > 0
+                          ? `${Math.round(
+                              (examsYear3.filter(
+                                (exam) => exam.status === "scheduled"
+                              ).length /
+                                examsYear3.length) *
+                                100
+                            )}%`
+                          : "0%"}
+                      </p>
+                      <p className="text-sm text-gray-600">Completion Rate</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            examsYear3.length > 0
+                              ? Math.min(
+                                  (examsYear3.filter(
+                                    (exam) => exam.status === "scheduled"
+                                  ).length /
+                                    examsYear3.length) *
+                                    100,
+                                  100
+                                )
+                              : 0
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Alerts Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {alertsYear3.length}
+                      </p>
+                      <p className="text-sm text-gray-600">Total Alerts</p>
+                    </div>
+                  </div>
+                  {/* Subjects Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                        <Users className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {subjects.filter((s) => s.year === 3).length}
+                      </p>
+                      <p className="text-sm text-gray-600">Total Subjects</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Content Sections */}
+              {/* Department Overview removed as requested */}
             </div>
           )}
           {/* Alerts Tab */}
