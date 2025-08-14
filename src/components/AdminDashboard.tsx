@@ -282,11 +282,7 @@ export const AdminDashboard: React.FC = () => {
                       System
                     </p>
                   </div>
-                  <div className="text-right space-y-2">
-                    <div className="text-2xl font-bold">14 Departments</div>
-                    <div className="text-2xl font-bold">150+ Faculty</div>
-                    <div className="text-2xl font-bold">3000+ Students</div>
-                  </div>
+                 
                 </div>
               </div>
               {/* Stats Cards */}

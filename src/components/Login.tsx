@@ -68,7 +68,7 @@ export const Login: React.FC = () => {
                 <Building className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-lg">12 Departments</h3>
+                <h3 className="text-white font-semibold text-lg">14 Departments</h3>
                 <p className="text-blue-200">Comprehensive engineering programs across all disciplines.</p>
               </div>
             </div>

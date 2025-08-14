@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Calendar, AlertCircle, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
-import { subjectService, Subject } from '../services/subjectService';
-import { examService } from '../services/examService';
+import React, { useState, useEffect } from "react";
+import {
+  Search,
+  Trash2,
+  Calendar,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+} from "lucide-react";
+import { subjectService, Subject } from "../services/subjectService";
+import { examService } from "../services/examService";
 
 interface SubjectWithSchedule extends Subject {
   isScheduled: boolean;
@@ -11,25 +19,25 @@ interface SubjectWithSchedule extends Subject {
 
 export const SubjectManagement: React.FC = () => {
   const [subjects, setSubjects] = useState<SubjectWithSchedule[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'pending'>('all');
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
-  const [selectedSemester, setSelectedSemester] = useState<number | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "scheduled" | "pending"
+  >("all");
+  const [selectedYear, setSelectedYear] = useState<number | "all">("all");
+  const [selectedSemester, setSelectedSemester] = useState<number | "all">(
+    "all"
+  );
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
 
   // Get unique years and semesters from subjects
-  const uniqueYears = [...new Set(subjects.map(s => s.year))].sort();
-  const uniqueSemesters = [...new Set(subjects.map(s => s.sem))].sort();
-  
+  const uniqueYears = [...new Set(subjects.map((s) => s.year))].sort();
+  const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))].sort();
+
   // Allowed semesters depend on selected year
   const allowedSemesters: number[] =
-    selectedYear === 2
-      ? [3, 4]
-      : selectedYear === 3
-      ? [5, 6]
-      : uniqueSemesters;
+    selectedYear === 2 ? [3, 4] : selectedYear === 3 ? [5, 6] : uniqueSemesters;
 
   useEffect(() => {
     loadSubjects();
@@ -40,23 +48,26 @@ export const SubjectManagement: React.FC = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showYearDropdown || showSemesterDropdown) {
         const target = event.target as Element;
-        if (!target.closest('.dropdown-container')) {
+        if (!target.closest(".dropdown-container")) {
           setShowYearDropdown(false);
           setShowSemesterDropdown(false);
         }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showYearDropdown, showSemesterDropdown]);
 
   // Ensure semester selection stays valid when year changes
   useEffect(() => {
-    if (selectedSemester !== 'all' && !allowedSemesters.includes(selectedSemester)) {
-      setSelectedSemester('all');
+    if (
+      selectedSemester !== "all" &&
+      !allowedSemesters.includes(selectedSemester)
+    ) {
+      setSelectedSemester("all");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedYear]);
@@ -65,72 +76,78 @@ export const SubjectManagement: React.FC = () => {
     try {
       setLoading(true);
       const subjectsData = await subjectService.getAllSubjects();
-      
+
       // Try to get scheduled exams, but don't fail if there are none
       let scheduledExams: any[] = [];
       try {
         scheduledExams = await examService.getScheduledExams();
       } catch (scheduleError) {
-        console.log('No scheduled exams found yet:', scheduleError);
+        console.log("No scheduled exams found yet:", scheduleError);
       }
-      
+
       // Create a map of scheduled exams by subject ID
       const scheduledMap = new Map();
-      scheduledExams.forEach(schedule => {
+      scheduledExams.forEach((schedule) => {
         scheduledMap.set(schedule.subjectId, {
           date: schedule.examDate,
-          assignedBy: schedule.assignedBy
+          assignedBy: schedule.assignedBy,
         });
       });
 
       // Combine subject data with scheduling status
-      const subjectsWithSchedule: SubjectWithSchedule[] = subjectsData.map(subject => ({
-        ...subject,
-        isScheduled: scheduledMap.has(subject.id),
-        scheduledDate: scheduledMap.get(subject.id)?.date,
-        assignedBy: scheduledMap.get(subject.id)?.assignedBy
-      }));
+      const subjectsWithSchedule: SubjectWithSchedule[] = subjectsData.map(
+        (subject) => ({
+          ...subject,
+          isScheduled: scheduledMap.has(subject.id),
+          scheduledDate: scheduledMap.get(subject.id)?.date,
+          assignedBy: scheduledMap.get(subject.id)?.assignedBy,
+        })
+      );
 
       setSubjects(subjectsWithSchedule);
     } catch (error) {
-      console.error('Error loading subjects:', error);
+      console.error("Error loading subjects:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredSubjects = subjects.filter(subject => {
-    const matchesSearch = 
+  const filteredSubjects = subjects.filter((subject) => {
+    const matchesSearch =
       subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       subject.subcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       subject.department.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = 
-      filterStatus === 'all' ||
-      (filterStatus === 'scheduled' && subject.isScheduled) ||
-      (filterStatus === 'pending' && !subject.isScheduled);
-    
-    const matchesYear = selectedYear === 'all' || subject.year === selectedYear;
-    const matchesSemester = selectedSemester === 'all'
-      ? (selectedYear === 2
-          ? [3, 4].includes(subject.sem)
+
+    const matchesFilter =
+      filterStatus === "all" ||
+      (filterStatus === "scheduled" && subject.isScheduled) ||
+      (filterStatus === "pending" && !subject.isScheduled);
+
+    const matchesYear = selectedYear === "all" || subject.year === selectedYear;
+    const matchesSemester =
+      selectedSemester === "all"
+        ? selectedYear === 2
+          ? [3, 4].includes(subject.semester)
           : selectedYear === 3
-          ? [5, 6].includes(subject.sem)
-          : true)
-      : subject.sem === selectedSemester;
-    
+          ? [5, 6].includes(subject.semester)
+          : true
+        : subject.semester === selectedSemester;
+
+    // If a specific semester is selected, only show subjects for that semester
+    // This ensures strict filtering for cases like 2nd year, sem 3
+
     // Debug logging
-    if (selectedYear !== 'all' || selectedSemester !== 'all') {
-      console.log('Filtering subject:', subject.name, {
+    if (selectedYear !== "all" || selectedSemester !== "all") {
+      console.log("Filtering subject:", subject.name, {
         year: subject.year,
         selectedYear,
-        semester: subject.sem,
+        semester: subject.semester,
         selectedSemester,
         matchesYear,
-        matchesSemester
+        matchesSemester,
       });
     }
-    
+
     return matchesSearch && matchesFilter && matchesYear && matchesSemester;
   });
 
@@ -161,13 +178,13 @@ export const SubjectManagement: React.FC = () => {
   // Edit functionality removed
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this subject?')) {
+    if (window.confirm("Are you sure you want to delete this subject?")) {
       try {
         await subjectService.deleteSubject(id);
         // Refresh the subjects list
         await loadSubjects();
       } catch (error) {
-        console.error('Error deleting subject:', error);
+        console.error("Error deleting subject:", error);
       }
     }
   };
@@ -180,31 +197,31 @@ export const SubjectManagement: React.FC = () => {
 
   const stats = {
     total: subjects.length,
-    scheduled: subjects.filter(s => s.isScheduled).length,
-    pending: subjects.filter(s => !s.isScheduled).length
+    scheduled: subjects.filter((s) => s.isScheduled).length,
+    pending: subjects.filter((s) => !s.isScheduled).length,
   };
 
   // Update stats based on current filters (excluding text search)
   const getFilteredStats = () => {
-    const yearFiltered = subjects.filter(s => 
-      selectedYear === 'all' || s.year === selectedYear
+    const yearFiltered = subjects.filter(
+      (s) => selectedYear === "all" || s.year === selectedYear
     );
-    const semesterFiltered = yearFiltered.filter(s => {
-      if (selectedSemester === 'all') {
-        if (selectedYear === 2) return [3, 4].includes(s.sem);
-        if (selectedYear === 3) return [5, 6].includes(s.sem);
+    const semesterFiltered = yearFiltered.filter((s) => {
+      if (selectedSemester === "all") {
+        if (selectedYear === 2) return [3, 4].includes(s.semester);
+        if (selectedYear === 3) return [5, 6].includes(s.semester);
         return true;
       }
-      return s.sem === selectedSemester;
+      return s.semester === selectedSemester;
     });
     const totalYearSem = semesterFiltered.length;
-    const scheduled = semesterFiltered.filter(s => s.isScheduled).length;
+    const scheduled = semesterFiltered.filter((s) => s.isScheduled).length;
     const pending = totalYearSem - scheduled;
     return {
       total: subjects.length,
       totalYearSem,
       scheduled,
-      pending
+      pending,
     };
   };
 
@@ -226,8 +243,12 @@ export const SubjectManagement: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Subject Management</h2>
-          <p className="text-sm text-gray-600">Manage subjects and view their scheduling status</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Subject Management
+          </h2>
+          <p className="text-sm text-gray-600">
+            Manage subjects and view their scheduling status
+          </p>
         </div>
       </div>
 
@@ -239,8 +260,12 @@ export const SubjectManagement: React.FC = () => {
               <Calendar className="h-6 w-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Subjects</p>
-              <p className="text-2xl font-bold text-gray-900">{currentStats.totalYearSem}</p>
+              <p className="text-sm font-medium text-gray-600">
+                Total Subjects
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {currentStats.totalYearSem}
+              </p>
             </div>
           </div>
         </div>
@@ -251,7 +276,9 @@ export const SubjectManagement: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Scheduled</p>
-              <p className="text-2xl font-bold text-gray-900">{currentStats.scheduled}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {currentStats.scheduled}
+              </p>
             </div>
           </div>
         </div>
@@ -262,7 +289,9 @@ export const SubjectManagement: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{currentStats.pending}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {currentStats.pending}
+              </p>
             </div>
           </div>
         </div>
@@ -272,30 +301,34 @@ export const SubjectManagement: React.FC = () => {
               <Search className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Visible Results</p>
-              <p className="text-2xl font-bold text-gray-900">{filteredSubjects.length}</p>
+              <p className="text-sm font-medium text-gray-600">
+                Visible Results
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {filteredSubjects.length}
+              </p>
             </div>
           </div>
         </div>
-        
+
         {/* Filter Summary */}
-        {(selectedYear !== 'all' || selectedSemester !== 'all') && (
+        {(selectedYear !== "all" || selectedSemester !== "all") && (
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <span>Showing results for:</span>
-            {selectedYear !== 'all' && (
+            {selectedYear !== "all" && (
               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                 Year {selectedYear}
               </span>
             )}
-            {selectedSemester !== 'all' && (
+            {selectedSemester !== "all" && (
               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 Semester {selectedSemester}
               </span>
             )}
             <button
               onClick={() => {
-                setSelectedYear('all');
-                setSelectedSemester('all');
+                setSelectedYear("all");
+                setSelectedSemester("all");
               }}
               className="text-blue-600 hover:text-blue-800 underline text-xs"
             >
@@ -320,7 +353,7 @@ export const SubjectManagement: React.FC = () => {
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-        
+
         {/* Filter Controls */}
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Year Dropdown */}
@@ -329,14 +362,16 @@ export const SubjectManagement: React.FC = () => {
               onClick={() => setShowYearDropdown(!showYearDropdown)}
               className="flex items-center justify-between w-40 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <span>{selectedYear === 'all' ? 'All Years' : `Year ${selectedYear}`}</span>
+              <span>
+                {selectedYear === "all" ? "All Years" : `Year ${selectedYear}`}
+              </span>
               <ChevronDown className="h-4 w-4 ml-2" />
             </button>
             {showYearDropdown && (
               <div className="absolute z-10 w-40 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
                 <button
                   onClick={() => {
-                    setSelectedYear('all');
+                    setSelectedYear("all");
                     setShowYearDropdown(false);
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
@@ -365,14 +400,18 @@ export const SubjectManagement: React.FC = () => {
               onClick={() => setShowSemesterDropdown(!showSemesterDropdown)}
               className="flex items-center justify-between w-40 px-2 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <span>{selectedSemester === 'all' ? 'All Semesters' : `Semester ${selectedSemester}`}</span>
+              <span>
+                {selectedSemester === "all"
+                  ? "All Semesters"
+                  : `Semester ${selectedSemester}`}
+              </span>
               <ChevronDown className="h-4 w-4 ml-2" />
             </button>
             {showSemesterDropdown && (
               <div className="absolute z-10 w-40 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
                 <button
                   onClick={() => {
-                    setSelectedSemester('all');
+                    setSelectedSemester("all");
                     setShowSemesterDropdown(false);
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
@@ -398,31 +437,31 @@ export const SubjectManagement: React.FC = () => {
           {/* Status Filter Buttons */}
           <div className="flex space-x-2">
             <button
-              onClick={() => setFilterStatus('all')}
+              onClick={() => setFilterStatus("all")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterStatus === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                filterStatus === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               All ({currentStats.totalYearSem})
             </button>
             <button
-              onClick={() => setFilterStatus('scheduled')}
+              onClick={() => setFilterStatus("scheduled")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterStatus === 'scheduled'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-200'
+                filterStatus === "scheduled"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-200"
               }`}
             >
               Scheduled ({currentStats.scheduled})
             </button>
             <button
-              onClick={() => setFilterStatus('pending')}
+              onClick={() => setFilterStatus("pending")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterStatus === 'pending'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                filterStatus === "pending"
+                  ? "bg-red-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               Pending ({currentStats.pending})
@@ -465,18 +504,28 @@ export const SubjectManagement: React.FC = () => {
                 <tr key={subject.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{subject.name}</div>
-                      <div className="text-sm text-gray-500">{subject.subcode}</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {subject.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {subject.subcode}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{subject.department}</div>
+                    <div className="text-sm text-gray-900">
+                      {subject.department}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">Year {subject.year}</div>
+                    <div className="text-sm text-gray-900">
+                      Year {subject.year}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">Semester {subject.sem}</div>
+                    <div className="text-sm text-gray-900">
+                      Semester {subject.semester}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(subject.isScheduled)}
@@ -487,7 +536,9 @@ export const SubjectManagement: React.FC = () => {
                         <div className="flex items-center space-x-2">
                           <Calendar className="h-4 w-4 text-gray-400" />
                           <span className="text-sm text-gray-900">
-                            {new Date(subject.scheduledDate!).toLocaleDateString()}
+                            {new Date(
+                              subject.scheduledDate!
+                            ).toLocaleDateString()}
                           </span>
                         </div>
 
@@ -528,10 +579,12 @@ export const SubjectManagement: React.FC = () => {
           </div>
           <p className="text-gray-500">No subjects found</p>
           <p className="text-sm text-gray-400 mt-1">
-            {searchTerm ? 'Try adjusting your search criteria' : 'No subjects available'}
+            {searchTerm
+              ? "Try adjusting your search criteria"
+              : "No subjects available"}
           </p>
         </div>
       )}
     </div>
   );
-}; 
+};
