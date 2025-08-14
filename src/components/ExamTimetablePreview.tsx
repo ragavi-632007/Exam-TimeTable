@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
-import { examService } from '../services/examService';
+
+interface ScheduledExam {
+  id: string;
+  examDate: string;
+  department: string;
+  subjectCode: string;
+  subjectName: string;
+  year: number;
+  subject_detail?: {
+    year: number;
+  };
+}
 
 interface ExamTimetablePreviewProps {
-  scheduledExams: any[];
+  scheduledExams: ScheduledExam[];
 }
 
 export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ scheduledExams }) => {
-  const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Define all departments based on the image description
@@ -17,14 +27,11 @@ export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ sche
   ];
 
   useEffect(() => {
-    // Extract unique departments from scheduled exams
-    const uniqueDepts = [...new Set(scheduledExams.map(exam => exam.department))];
-    setDepartments(uniqueDepts);
     setLoading(false);
   }, [scheduledExams]);
 
   // Get unique dates from scheduled exams and sort them
-  const uniqueDates = [...new Set(scheduledExams.map(exam => exam.examDate))].sort();
+  const uniqueDates = [...new Set(scheduledExams.filter(exam => exam?.examDate).map(exam => exam.examDate))].sort();
 
   // Group exams by date and department
   const examsByDateAndDept = uniqueDates.reduce((acc, date) => {
@@ -54,62 +61,67 @@ export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ sche
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <Calendar className="h-5 w-5 text-green-500 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Scheduled Exams Table Preview</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Calendar className="h-5 w-5 text-green-500 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">
+              Year {scheduledExams[0]?.year || scheduledExams[0]?.subject_detail?.year || ''} Exam Schedule
+            </h3>
+          </div>
+          <div className="text-sm text-gray-500">
+            {new Date().toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })}
+          </div>
         </div>
       </div>
 
-      {uniqueDates.length === 0 ? (
-        <div className="px-6 py-8 text-center">
-          <p className="text-gray-500">No exams scheduled yet</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-green-50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
+      <div className="overflow-x-auto">
+        <table className="min-w-full">
+          <thead className="bg-green-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                DATE
+              </th>
+              {allDepartments.map(dept => (
+                <th key={dept} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                  {dept}
                 </th>
-                {allDepartments.map(dept => (
-                  <th key={dept} className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {dept}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {uniqueDates.map(date => (
-                <tr key={date} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {new Date(date).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric'
-                    })}
-                  </td>
-                  {allDepartments.map(dept => {
-                    const exam = examsByDateAndDept[date][dept];
-                    return (
-                      <td key={dept} className="px-2 py-2 text-sm text-gray-900 text-center">
-                        {exam ? (
-                          <div className="space-y-1">
-                            <div className="font-medium text-xs">{exam.subjectCode}</div>
-                            <div className="text-xs text-gray-600">{exam.subjectName}</div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </tr>
+          </thead>
+          <tbody className="bg-white">
+            {uniqueDates.map(date => (
+              <tr key={date} className="hover:bg-gray-50">
+                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border">
+                  {new Date(date).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })}
+                </td>
+                {allDepartments.map(dept => {
+                  const exam = examsByDateAndDept[date][dept];
+                  return (
+                    <td key={dept} className="px-4 py-3 text-sm text-center border">
+                      {exam ? (
+                        <div>
+                          <div className="font-medium text-sm">{exam.subjectCode}</div>
+                          <div className="text-xs text-gray-600 mt-1">{exam.subjectName}</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

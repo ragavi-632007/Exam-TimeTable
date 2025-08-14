@@ -13,6 +13,9 @@ export interface Exam {
   courseId: string;
   department: string;
   year: 2 | 3; // Only 2nd and 3rd years allowed
+  subject_detail?: {
+    year: 2 | 3;
+  };
   semester: number;
   examType?: 'IA1' | 'IA2' | 'IA3';
   teacherId: string;

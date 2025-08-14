@@ -64,10 +64,14 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
     // Check for conflicts
     const scheduledExams = exams.filter(e => e.status === 'scheduled' && e.scheduledDate === date);
     
-    // Check for same department conflict
-    const sameDeptConflict = scheduledExams.find(e => e.department === exam.department);
-    if (sameDeptConflict) {
-      setConflict(`Conflict: Another exam is already scheduled for ${exam.department} department on this date.`);
+    // Check for same department and year conflict
+    const sameDeptYearConflict = scheduledExams.find(e => 
+      e.department === exam.department && 
+      e.year === exam.year
+    );
+    
+    if (sameDeptYearConflict) {
+      setConflict(`Conflict: Another exam is already scheduled for ${exam.department} department year ${exam.year} on this date.`);
       return;
     }
     

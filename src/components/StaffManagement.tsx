@@ -158,9 +158,6 @@ export const StaffManagement: React.FC = () => {
                      CONTACT
                    </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     ASSIGNED SUBJECTS
-                   </th>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                      ACTIONS
                    </th>
                 </tr>
@@ -168,7 +165,7 @@ export const StaffManagement: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                                  {filteredStaff.length === 0 ? (
                    <tr>
-                     <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                     <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                        {searchTerm ? 'No staff members found matching your search.' : 'No staff members found.'}
                      </td>
                    </tr>
@@ -199,20 +196,6 @@ export const StaffManagement: React.FC = () => {
                              <Phone className="h-4 w-4 text-gray-400" />
                              <span className="text-sm text-gray-900">{staff.phone}</span>
                            </div>
-                         </div>
-                       </td>
-                       <td className="px-6 py-4">
-                         <div className="space-y-2">
-                           {staff.subjects && staff.subjects.length > 0 ? (
-                             staff.subjects.map((subject) => (
-                               <div key={subject.id} className="bg-gray-50 rounded p-2">
-                                 <div className="text-sm font-medium text-gray-900">{subject.subject_name}</div>
-                                 <div className="text-xs text-gray-500">Code: {subject.subject_code}</div>
-                               </div>
-                             ))
-                           ) : (
-                             <div className="text-sm text-gray-400 italic">No subjects assigned</div>
-                           )}
                          </div>
                        </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

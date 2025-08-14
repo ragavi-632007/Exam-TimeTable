@@ -232,27 +232,49 @@ export const examService = {
       throw new Error(sameDayError.message);
     }
 
-    // Filter exams by department name to ensure correct comparison
-    const sameDeptExams =
+    // Get current subject's year
+    let currentYear: number;
+    if (subjectId.startsWith("staff-subject-")) {
+      const staffId = subjectId.replace("staff-subject-", "");
+      const { data: staffSubject } = await supabase
+        .from("subject_detail")
+        .select("year")
+        .eq("subcode", staffData?.subject_code)
+        .single();
+      currentYear = staffSubject?.year || 0;
+    } else {
+      const { data: subjectData } = await supabase
+        .from("subject_detail")
+        .select("year")
+        .eq("id", subjectId)
+        .single();
+      currentYear = subjectData?.year || 0;
+    }
+
+    // Filter exams by department name and year to ensure correct comparison
+    const sameDeptAndYearExams =
       sameDayExams?.filter(
-        (exam) => exam.departments?.name === currentDeptName
+        (exam) => 
+          exam.departments?.name === currentDeptName &&
+          exam.subject_detail?.year === currentYear
       ) || [];
 
-    // Debug: log all exams found for this department and date
+    // Debug: log all exams found for this department, year and date
     console.log("Exam conflict check BEFORE insert:", {
       examDate,
       currentDeptName,
-      sameDeptExams,
+      currentYear,
+      sameDeptAndYearExams,
       allSameDayExams: sameDayExams,
     });
 
-    if (sameDeptExams.length > 0) {
+    if (sameDeptAndYearExams.length > 0){
       throw new Error(
-        `${currentDeptName} department already has an exam scheduled on ${examDate}. Cannot schedule multiple exams for the same department on the same day.`
+        `${currentDeptName} department already has an exam scheduled for year ${currentYear} on ${examDate}. Cannot schedule multiple exams for the same department and year on the same day.`
       );
     }
 
-    // Check for time conflicts only within the same department
+    // Check for time conflicts only within the same department and year
     const { data: timeConflicts, error: conflictError } = await supabase
       .from("exam_schedules")
       .select(
@@ -263,16 +285,20 @@ export const examService = {
       `
       )
       .eq("exam_date", examDate)
-
       .eq("department_id", currentDepartmentId);
 
     if (conflictError) {
       throw new Error(conflictError.message);
     }
 
-    if (timeConflicts && timeConflicts.length > 0) {
+    // Filter conflicts to only include same year
+    const sameYearConflicts = timeConflicts?.filter(
+      conflict => conflict.subject_detail?.year === currentYear
+    ) || [];
+
+    if (sameYearConflicts.length > 0) {
       throw new Error(
-        `Conflict detected: Department already has an exam scheduled on ${examDate}`
+        `Conflict detected: Department already has an exam scheduled for year ${currentYear} on ${examDate}`
       );
     }
 
@@ -671,8 +697,8 @@ export const examService = {
   },
 
   // Get scheduled exams for admin dashboard
-  async getScheduledExams(): Promise<any[]> {
-    const { data, error } = await supabase
+  async getScheduledExams(year?: number): Promise<any[]> {
+    let query = supabase
       .from("exam_schedules")
       .select(
         `
@@ -680,8 +706,14 @@ export const examService = {
         subject_detail(*),
         departments!exam_schedules_department_id_fkey(*)
       `
-      )
-      .order("exam_date", { ascending: true })
+      );
+
+    // Filter by year if provided
+    if (year !== undefined) {
+      query = query.eq('subject_detail.year', year);
+    }
+
+    const { data, error } = await query
       .order("exam_date", { ascending: true });
 
     if (error) {

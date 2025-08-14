@@ -475,107 +475,92 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
               </div>
 
               {/* Dynamic Scheduled Exams Table Preview */}
-              {filteredPreviewExams.length > 0 ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start mb-1">
-                    <Calendar className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
-                    <h5 className="text-sm font-medium text-green-800">
-                      Scheduled Exams Table Preview
-                    </h5>
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Calendar className="h-5 w-5 text-green-500 mr-2" />
+                      <h3 className="text-lg font-medium text-gray-900">
+                        Year {selectedYear} Exam Schedule
+                      </h3>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {new Date().toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-700 mb-3">
-                    Start date:{" "}
-                    {firstPreviewDate
-                      ? firstPreviewDate.toLocaleDateString("en-GB")
-                      : "-"}
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs border border-green-200 rounded-lg">
-                      <thead>
-                        <tr className="bg-green-100">
-                          <th className="px-2 py-2 border">Date</th>
-                          {departments.map((dept) => (
-                            <th key={dept.code} className="px-2 py-2 border">
-                              {dept.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Build schedule data: group by date, then by department, just like PDF */}
-                        {(() => {
-                          // Build scheduleMap: { date: { deptCode: exam } }
-                          const scheduleMap = new Map();
-                          scheduledExams.forEach((exam) => {
-                            if (!exam.scheduledDate || !exam.department) return;
-                            const date = new Date(
-                              exam.scheduledDate
-                            ).toLocaleDateString("en-GB");
-                            if (!scheduleMap.has(date))
-                              scheduleMap.set(date, {});
-                            scheduleMap.get(date)[exam.department] = exam;
-                          });
-                          const sortedDates = Array.from(
-                            scheduleMap.keys()
-                          ).sort((a, b) => {
-                            // dd/mm/yyyy to yyyy-mm-dd for sort
-                            const [da, ma, ya] = a.split("/").map(Number);
-                            const [db, mb, yb] = b.split("/").map(Number);
-                            return (
-                              new Date(ya, ma - 1, da).getTime() -
-                              new Date(yb, mb - 1, db).getTime()
-                            );
-                          });
-                          return sortedDates.map((date) => (
-                            <tr key={date} className="bg-white">
-                              <td className="px-2 py-2 border font-semibold">
-                                {date}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-green-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                          DATE
+                        </th>
+                        {departments.map((dept) => (
+                          <th key={dept.code} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                            {dept.code}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {(() => {
+                        const scheduleMap = new Map();
+                        filteredPreviewExams.forEach((exam) => {
+                          if (!exam.scheduledDate && !exam.examDate) return;
+                          const date = new Date(exam.scheduledDate || exam.examDate).toLocaleDateString("en-GB");
+                          if (!scheduleMap.has(date)) scheduleMap.set(date, {});
+                          scheduleMap.get(date)[exam.department] = exam;
+                        });
+
+                        const sortedDates = Array.from(scheduleMap.keys()).sort((a, b) => {
+                          const [da, ma, ya] = a.split("/").map(Number);
+                          const [db, mb, yb] = b.split("/").map(Number);
+                          return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+                        });
+
+                        if (sortedDates.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={departments.length + 1} className="px-4 py-8 text-center text-gray-500">
+                                No exams scheduled yet
                               </td>
-                              {departments.map((dept) => {
-                                const exam = scheduleMap.get(date)[dept.code];
-                                return (
-                                  <td
-                                    key={dept.code}
-                                    className="px-2 py-2 border"
-                                  >
-                                    {exam ? (
-                                      <div>
-                                        <span className="font-medium text-gray-900">
-                                          {exam.subjectCode}
-                                        </span>
-                                        <br />
-                                        <span className="text-gray-700">
-                                          {exam.subjectName}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-400">-</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
                             </tr>
-                          ));
-                        })()}
+                          );
+                        }
+
+                        return sortedDates.map((date) => (
+                          <tr key={date} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border">
+                              {date}
+                            </td>
+                            {departments.map((dept) => {
+                              const exam = scheduleMap.get(date)[dept.code];
+                              return (
+                                <td key={dept.code} className="px-4 py-3 text-sm text-center border">
+                                  {exam ? (
+                                    <div>
+                                      <div className="font-medium text-sm">{exam.subjectCode}</div>
+                                      <div className="text-xs text-gray-600 mt-1">{exam.subjectName}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ));
+                      })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <Calendar className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
-                    <div>
-                      <h5 className="text-sm font-medium text-yellow-800">
-                        No Scheduled Exams
-                      </h5>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        No exams have been scheduled for the selected Year/Semester and Examination Type.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className="flex justify-end">
                 <button
                   onClick={generatePDF}

@@ -17,7 +17,6 @@ import {
 import { CreateExamAlert } from "./CreateExamAlert";
 import { EditExamAlert } from "./EditExamAlert";
 import { EditExamSchedule } from "./EditExamSchedule";
-// import { ExamScheduleTable } from "./ExamScheduleTable";
 import { PDFGenerator } from "./PDFGenerator";
 import { StaffManagement } from "./StaffManagement";
 import { SubjectManagement } from "./SubjectManagement";
@@ -367,7 +366,7 @@ export const AdminDashboard: React.FC = () => {
                 ))}
               </div>
               {/* Content Sections */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 mt-6">
                 {/* Department Overview */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-center space-x-2 mb-4">
