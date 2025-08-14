@@ -66,8 +66,6 @@ export const SubjectManagement: React.FC = () => {
       setLoading(true);
       const subjectsData = await subjectService.getAllSubjects();
       
-      console.log('Loaded subjects from database:', subjectsData.length, subjectsData.slice(0, 3));
-      
       // Try to get scheduled exams, but don't fail if there are none
       let scheduledExams: any[] = [];
       try {
@@ -93,7 +91,6 @@ export const SubjectManagement: React.FC = () => {
         assignedBy: scheduledMap.get(subject.id)?.assignedBy
       }));
 
-      console.log('Final subjects with schedule:', subjectsWithSchedule.length, subjectsWithSchedule.slice(0, 3));
       setSubjects(subjectsWithSchedule);
     } catch (error) {
       console.error('Error loading subjects:', error);
@@ -114,20 +111,25 @@ export const SubjectManagement: React.FC = () => {
       (filterStatus === 'pending' && !subject.isScheduled);
     
     const matchesYear = selectedYear === 'all' || subject.year === selectedYear;
-    const matchesSemester = selectedSemester === 'all' || subject.sem === selectedSemester;
+    const matchesSemester = selectedSemester === 'all'
+      ? (selectedYear === 2
+          ? [3, 4].includes(subject.sem)
+          : selectedYear === 3
+          ? [5, 6].includes(subject.sem)
+          : true)
+      : subject.sem === selectedSemester;
     
     // Debug logging
-    console.log('Filtering subject:', subject.name, {
-      year: subject.year,
-      selectedYear,
-      semester: subject.sem,
-      selectedSemester,
-      matchesYear,
-      matchesSemester,
-      matchesSearch,
-      matchesFilter,
-      finalResult: matchesSearch && matchesFilter && matchesYear && matchesSemester
-    });
+    if (selectedYear !== 'all' || selectedSemester !== 'all') {
+      console.log('Filtering subject:', subject.name, {
+        year: subject.year,
+        selectedYear,
+        semester: subject.sem,
+        selectedSemester,
+        matchesYear,
+        matchesSemester
+      });
+    }
     
     return matchesSearch && matchesFilter && matchesYear && matchesSemester;
   });
@@ -184,22 +186,20 @@ export const SubjectManagement: React.FC = () => {
 
   // Update stats based on current filters (excluding text search)
   const getFilteredStats = () => {
-    const yearFiltered = subjects.filter(s => selectedYear === 'all' || s.year === selectedYear);
-    const semesterFiltered = yearFiltered.filter(s => selectedSemester === 'all' || s.sem === selectedSemester);
-    
+    const yearFiltered = subjects.filter(s => 
+      selectedYear === 'all' || s.year === selectedYear
+    );
+    const semesterFiltered = yearFiltered.filter(s => {
+      if (selectedSemester === 'all') {
+        if (selectedYear === 2) return [3, 4].includes(s.sem);
+        if (selectedYear === 3) return [5, 6].includes(s.sem);
+        return true;
+      }
+      return s.sem === selectedSemester;
+    });
     const totalYearSem = semesterFiltered.length;
     const scheduled = semesterFiltered.filter(s => s.isScheduled).length;
     const pending = totalYearSem - scheduled;
-    
-    console.log('Stats calculation:', {
-      totalSubjects: subjects.length,
-      yearFiltered: yearFiltered.length,
-      semesterFiltered: semesterFiltered.length,
-      selectedYear,
-      selectedSemester,
-      sampleSubjects: subjects.slice(0, 3).map(s => ({ name: s.name, year: s.year, sem: s.sem }))
-    });
-    
     return {
       total: subjects.length,
       totalYearSem,

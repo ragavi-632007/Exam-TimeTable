@@ -14,7 +14,6 @@ import {
   LogOut,
   FileText,
   Edit,
-  ChevronDown,
 } from "lucide-react";
 import { ExamScheduler } from "./ExamScheduler";
 import { EditExamSchedule } from "./EditExamSchedule";
@@ -29,8 +28,6 @@ export const TeacherDashboard: React.FC = () => {
     "dashboard" | "subjects" | "schedule" | "timetable"
   >("dashboard");
   const [selectedYear, setSelectedYear] = useState<2 | 3>(2);
-  const [selectedSemester, setSelectedSemester] = useState<number | 'all'>('all');
-  const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
   const [selectedExamType, setSelectedExamType] = useState<
     "IA1" | "IA2" | "IA3"
   >("IA1");
@@ -39,39 +36,6 @@ export const TeacherDashboard: React.FC = () => {
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [examStartDate, setExamStartDate] = useState<string>("");
   const [examEndDate, setExamEndDate] = useState<string>("");
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showSemesterDropdown) {
-        const target = event.target as Element;
-        if (!target.closest('.dropdown-container')) {
-          setShowSemesterDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSemesterDropdown]);
-
-  // Allowed semesters depend on selected year
-  const allowedSemesters: number[] =
-    selectedYear === 2
-      ? [3, 4]
-      : selectedYear === 3
-      ? [5, 6]
-      : [1, 2, 3, 4, 5, 6, 7, 8];
-
-  // Ensure semester selection stays valid when year changes
-  useEffect(() => {
-    if (selectedSemester !== 'all' && !allowedSemesters.includes(selectedSemester)) {
-      setSelectedSemester('all');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear]);
 
   // Log when ExamScheduler modal is opened
   useEffect(() => {
@@ -109,8 +73,7 @@ export const TeacherDashboard: React.FC = () => {
   const departmentSubjects = exams.filter(
     (exam: any) =>
       exam.department?.trim().toLowerCase() ===
-      user?.department?.trim().toLowerCase() &&
-      (selectedSemester === 'all' || exam.semester === selectedSemester)
+      user?.department?.trim().toLowerCase()
   );
   
   const pendingExams = departmentSubjects.filter(
@@ -168,9 +131,7 @@ export const TeacherDashboard: React.FC = () => {
 
   // Calculate completion rate based on teacher's department only
   const teacherScheduledExams = scheduledExams.filter(
-    (exam: any) => 
-      exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase() &&
-      (selectedSemester === 'all' || exam.semester === selectedSemester)
+    (exam: any) => exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
   );
   
   const completionRate =
@@ -490,44 +451,6 @@ export const TeacherDashboard: React.FC = () => {
                         <option value={2}>II Year</option>
                         <option value={3}>III Year</option>
                       </select>
-                      
-                      <label className="text-sm font-medium text-gray-700">
-                        Select Semester:
-                      </label>
-                      <div className="relative dropdown-container">
-                        <button
-                          onClick={() => setShowSemesterDropdown(!showSemesterDropdown)}
-                          className="flex items-center justify-between w-40 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <span>{selectedSemester === 'all' ? 'All Semesters' : `Semester ${selectedSemester}`}</span>
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </button>
-                        {showSemesterDropdown && (
-                          <div className="absolute z-10 w-40 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                            <button
-                              onClick={() => {
-                                setSelectedSemester('all');
-                                setShowSemesterDropdown(false);
-                              }}
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
-                            >
-                              All Semesters
-                            </button>
-                            {allowedSemesters.map((semester) => (
-                              <button
-                                key={semester}
-                                onClick={() => {
-                                  setSelectedSemester(semester);
-                                  setShowSemesterDropdown(false);
-                                }}
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
-                              >
-                                Semester {semester}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
                   <div className="bg-white rounded-lg shadow-sm">
@@ -541,11 +464,6 @@ export const TeacherDashboard: React.FC = () => {
                         }
                         )
                       </h3>
-                      {selectedSemester !== 'all' && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Filtered by Semester {selectedSemester}
-                        </p>
-                      )}
                     </div>
                     {departmentSubjects.filter(
                       (subj: any) => subj.year === selectedYear
@@ -680,45 +598,6 @@ export const TeacherDashboard: React.FC = () => {
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Semester:
-                          </label>
-                          <div className="relative dropdown-container">
-                            <button
-                              onClick={() => setShowSemesterDropdown(!showSemesterDropdown)}
-                              className="flex items-center justify-between w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                              <span>{selectedSemester === 'all' ? 'All Semesters' : `Semester ${selectedSemester}`}</span>
-                              <ChevronDown className="h-4 w-4 ml-2" />
-                            </button>
-                            {showSemesterDropdown && (
-                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                                <button
-                                  onClick={() => {
-                                    setSelectedSemester('all');
-                                    setShowSemesterDropdown(false);
-                                  }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
-                                >
-                                  All Semesters
-                                </button>
-                                {allowedSemesters.map((semester) => (
-                                  <button
-                                    key={semester}
-                                    onClick={() => {
-                                      setSelectedSemester(semester);
-                                      setShowSemesterDropdown(false);
-                                    }}
-                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
-                                  >
-                                    Semester {semester}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Select Exam Type:
                           </label>
                           <select
@@ -819,26 +698,17 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
 
                     {scheduledExams
-                      .filter((exam) => 
-                        exam.year === selectedYear && 
-                        exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase() &&
-                        (selectedSemester === 'all' || exam.semester === selectedSemester)
-                      )
+                      .filter((exam) => exam.year === selectedYear && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
                       .length === 0 ? (
                       <div className="px-6 py-8 text-center">
                         <p className="text-gray-500">
                           No scheduled exams yet for Year {selectedYear}
-                          {selectedSemester !== 'all' ? ` Semester ${selectedSemester}` : ''}
                         </p>
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-200">
                         {scheduledExams
-                          .filter((exam) => 
-                            exam.year === selectedYear && 
-                            exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase() &&
-                            (selectedSemester === 'all' || exam.semester === selectedSemester)
-                          )
+                          .filter((exam) => exam.year === selectedYear && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
                           .map((exam) => (
                             <div key={exam.id} className="px-6 py-4">
                               <div className="flex items-center justify-between">
@@ -853,11 +723,6 @@ export const TeacherDashboard: React.FC = () => {
                                     <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
                                       Year {exam.year}
                                     </span>
-                                    {exam.semester && (
-                                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                        Sem {exam.semester}
-                                      </span>
-                                    )}
                                   </div>
                                   <p className="text-sm text-gray-600 mt-1">
                                     Department: {exam.department} • Course ID:{" "}
