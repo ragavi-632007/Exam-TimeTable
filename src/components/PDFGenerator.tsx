@@ -263,10 +263,14 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         colX += colWidths[i];
       }
 
-      // Build schedule data: group by date, then by department
+      // Build schedule data: group by date, then by department (filtered by year and semester)
       const scheduleMap = new Map();
       scheduledExams.forEach((exam) => {
         if (!exam.scheduledDate || !exam.department) return;
+        // Filter by selected year
+        if (String(exam.year) !== selectedYear) return;
+        // Filter by selected semester if one is selected
+        if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
         const date = new Date(exam.scheduledDate).toLocaleDateString("en-GB");
         if (!scheduleMap.has(date)) scheduleMap.set(date, {});
         scheduleMap.get(date)[exam.department] = exam;
