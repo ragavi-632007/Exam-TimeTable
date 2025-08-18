@@ -45,6 +45,7 @@ export const CreateExamAlert: React.FC<CreateExamAlertProps> = ({
       year: formData.year as 2 | 3,
       semester: formData.semester,
       refId: formData.refId,
+      departments: [], // Empty array for now
       status: "active" as const,
       createdBy: user.id,
     };

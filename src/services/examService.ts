@@ -987,6 +987,8 @@ export const examService = {
     departments: string[];
     status: "active" | "closed";
     createdBy: string;
+    refId?: string;
+    title?: string;
   }): Promise<ExamAlert> {
     const { data, error } = await supabase
       .from("exam_settings")
@@ -994,6 +996,12 @@ export const examService = {
         {
           exam_start_date: alertData.startDate,
           exam_end_date: alertData.endDate,
+          year: alertData.year,
+          semester: alertData.semester,
+          refid: alertData.refId,
+          exam_type: alertData.title?.includes('Internal Assessment') ? 
+            (alertData.title.includes('I') ? 'IA1' : alertData.title.includes('II') ? 'IA2' : 'IA3') :
+            alertData.title?.includes('Model') ? 'MODEL' : 'END_SEM',
           holidays: [],
           created_by: alertData.createdBy,
         },
