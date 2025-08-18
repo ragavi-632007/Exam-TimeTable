@@ -928,13 +928,13 @@ export const examService = {
 
     return data.map((setting) => ({
       id: setting.id,
-      title: `Exam Settings - ${setting.exam_start_date} to ${setting.exam_end_date}`,
+      title: setting.title || `Exam Settings - ${setting.exam_start_date} to ${setting.exam_end_date}`,
       startDate: setting.exam_start_date,
       endDate: setting.exam_end_date,
-      year: 2, // Use valid year type
-      semester: 3, // Use valid semester type
-      departments: [], // Will need to be derived from other data
-      status: "active",
+      year: setting.year || 2, // Use stored year or default to 2
+      semester: setting.semester || 1, // Use stored semester or default to 1
+      departments: setting.departments ? JSON.parse(setting.departments) : [], // Parse stored departments
+      status: setting.status || "active", // Use stored status or default to active
       createdAt: setting.created_at,
     }));
   },
@@ -948,6 +948,11 @@ export const examService = {
 
     if (updates.startDate) updateData.exam_start_date = updates.startDate;
     if (updates.endDate) updateData.exam_end_date = updates.endDate;
+    if (updates.year) updateData.year = updates.year;
+    if (updates.semester) updateData.semester = updates.semester;
+    if (updates.title) updateData.title = updates.title;
+    if (updates.status) updateData.status = updates.status;
+    if (updates.departments) updateData.departments = JSON.stringify(updates.departments);
 
     const { data, error } = await supabase
       .from("exam_settings")
@@ -967,13 +972,13 @@ export const examService = {
 
     return {
       id: data.id,
-      title: `Exam Settings - ${data.exam_start_date} to ${data.exam_end_date}`,
+      title: data.title || `Exam Settings - ${data.exam_start_date} to ${data.exam_end_date}`,
       startDate: data.exam_start_date,
       endDate: data.exam_end_date,
-      year: 2,
-      semester: 3,
-      departments: [],
-      status: "active",
+      year: data.year || 2,
+      semester: data.semester || 1,
+      departments: data.departments ? JSON.parse(data.departments) : [],
+      status: data.status || "active",
       createdAt: data.created_at,
     };
   },
@@ -999,9 +1004,12 @@ export const examService = {
           year: alertData.year,
           semester: alertData.semester,
           refid: alertData.refId,
+          title: alertData.title,
           exam_type: alertData.title?.includes('Internal Assessment') ? 
             (alertData.title.includes('I') ? 'IA1' : alertData.title.includes('II') ? 'IA2' : 'IA3') :
             alertData.title?.includes('Model') ? 'MODEL' : 'END_SEM',
+          departments: JSON.stringify(alertData.departments),
+          status: alertData.status,
           holidays: [],
           created_by: alertData.createdBy,
         },
@@ -1015,13 +1023,13 @@ export const examService = {
 
     return {
       id: data.id,
-      title: `Exam Settings - ${data.exam_start_date} to ${data.exam_end_date}`,
+      title: data.title || `Exam Settings - ${data.exam_start_date} to ${data.exam_end_date}`,
       startDate: data.exam_start_date,
       endDate: data.exam_end_date,
-      year: alertData.year,
-      semester: alertData.semester,
-      departments: alertData.departments,
-      status: alertData.status,
+      year: data.year || alertData.year,
+      semester: data.semester || alertData.semester,
+      departments: data.departments ? JSON.parse(data.departments) : alertData.departments,
+      status: data.status || alertData.status,
       createdAt: data.created_at,
     };
   },
