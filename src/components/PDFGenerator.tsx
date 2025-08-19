@@ -7,11 +7,20 @@ import { departmentService } from "../services/departmentService";
 
 // Define departments for PDF generation (fallback if API fails)
 const defaultDepartments = [
+  { code: "ACT", name: "Actuarial Science" },
+  { code: "AIDS", name: "Artificial Intelligence & Data Science" },
+  { code: "AIML", name: "Artificial Intelligence & Machine Learning" },
+  { code: "BME", name: "Biomedical Engineering" },
   { code: "CE", name: "Civil Engineering" },
-  { code: "CS", name: "Computer Science & Engineering" },
-  { code: "EC", name: "Electronics & Communication Engineering" },
+  { code: "CSBS", name: "Computer Science & Business Systems" },
+  { code: "CSE", name: "Computer Science & Engineering" },
+  { code: "CYBER", name: "Cyber Security" },
+  { code: "ECE", name: "Electronics & Communication Engineering" },
+  { code: "EEE", name: "Electrical & Electronics Engineering" },
   { code: "IT", name: "Information Technology" },
-  { code: "ME", name: "Mechanical Engineering" },
+  { code: "MCT", name: "Mechatronics" },
+  { code: "MECH", name: "Mechanical Engineering" },
+  { code: "VLSI", name: "VLSI Design" },
 ];
 
 // Accepts optional selectedAlert prop for dynamic data injection
@@ -25,7 +34,7 @@ interface PDFGeneratorProps {
 }
 
 export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
-  selectedAlert,
+  // selectedAlert,
 }) => {
   const [generating, setGenerating] = useState(false);
   const [selectedYear, setSelectedYear] = useState("2");
@@ -36,38 +45,26 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const [loading, setLoading] = useState(true);
 
   // Compute the first (earliest) scheduled date for the preview based on filters
-  const firstPreviewDate = useMemo(() => {
-    const dates: Date[] = scheduledExams
-      .filter((exam) => {
-        const matchesYear = String(exam.year) === selectedYear;
-        const matchesSem = selectedSemester
-          ? String(exam.semester ?? exam.sem ?? "") === selectedSemester
-          : true;
-        const type = exam.examType || exam.exam_type; // support both keys
-        const matchesType = type ? type === selectedExam : true; // if missing, don't filter out
-        const hasDate = Boolean(exam.scheduledDate || exam.examDate);
-        return matchesYear && matchesSem && hasDate;
-      })
-      .map((exam) => new Date((exam.scheduledDate || exam.examDate) as string))
-      .filter((d) => !isNaN(d.getTime()));
+  // Removed unused firstPreviewDate
 
-    if (dates.length === 0) return null;
-    dates.sort((a, b) => a.getTime() - b.getTime());
-    return dates[0];
-  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
-
-  // Derive filtered exams for preview table visibility
-  const filteredPreviewExams = useMemo(() => {
-    return scheduledExams.filter((exam) => {
-      const matchesYear = String(exam.year) === selectedYear;
-      const matchesSem = selectedSemester
-        ? String(exam.semester ?? exam.sem ?? "") === selectedSemester
-        : true;
-      const type = exam.examType || exam.exam_type;
-      const matchesType = type ? type === selectedExam : true;
-      return matchesYear && matchesSem && matchesType;
+  // Align preview logic with PDF export logic
+  const previewScheduleMap = useMemo(() => {
+    const map = new Map();
+    scheduledExams.forEach((exam) => {
+      if (!exam.scheduledDate || !exam.department) return;
+      if (String(exam.year) !== selectedYear) return;
+      if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
+      const date = new Date(exam.scheduledDate).toLocaleDateString("en-GB");
+      if (!map.has(date)) map.set(date, {});
+      map.get(date)[exam.department] = exam;
     });
-  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
+    return map;
+  }, [scheduledExams, selectedYear, selectedSemester]);
+  const previewSortedDates = Array.from(previewScheduleMap.keys()).sort((a, b) => {
+    const [da, ma, ya] = a.split("/").map(Number);
+    const [db, mb, yb] = b.split("/").map(Number);
+    return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+  });
 
   // Load scheduled exams and departments
   useEffect(() => {
@@ -128,90 +125,79 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     try {
       const pdf = new jsPDF({ orientation: "landscape" });
       const pageWidth = pdf.internal.pageSize.width;
-      const pageHeight = pdf.internal.pageSize.height;
+  // Removed unused pageHeight
       let y = 12;
+      // Helper to load image from public as base64 (not used currently)
+      // const loadImageAsBase64 = (url: string): Promise<string> => {
+      //   return new Promise((resolve, reject) => {
+      //     const img = new window.Image();
+      //     img.crossOrigin = "Anonymous";
+      //     img.onload = function () {
+      //       const canvas = document.createElement("canvas");
+      //       canvas.width = img.width;
+      //       canvas.height = img.height;
+      //       const ctx = canvas.getContext("2d");
+      //       ctx?.drawImage(img, 0, 0);
+      //       resolve(canvas.toDataURL("image/png"));
+      //     };
+      //     img.onerror = function () {
+      //       reject(new Error("Failed to load image"));
+      //     };
+      //     img.src = url;
+      //   });
+      // };
 
-      // Helper to load image from public as base64
-      const loadImageAsBase64 = (url: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          const img = new window.Image();
-          img.crossOrigin = "Anonymous";
-          img.onload = function () {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext("2d");
-            ctx?.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL("image/png"));
-          };
-          img.onerror = reject;
-          img.src = url;
-        });
-      };
-
-      // Add logo (left) from public folder
+      // --- Accurate PDF Header (matching previous version) ---
+      // Add CIT logo (left side) using base64 for synchronous PDF generation
+      let logoBase64 = null;
       try {
-        const logoBase64 = await loadImageAsBase64("/cit_logo.jpg");
-        pdf.addImage(logoBase64, "JPEG", 12, 8, 28, 28);
-      } catch (e) {}
-
-      // Header (no border)
-      pdf.setFontSize(18);
+        // Fetch logo.jpg as base64
+        const response = await fetch('/cit_logo.jpg');
+        const blob = await response.blob();
+        const reader = new window.FileReader();
+        logoBase64 = await new Promise((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        // If logo fails, skip
+      }
+      // Header layout: logo (left), college name (right, same line), then details below
+      const headerY = y + 1;
+      if (logoBase64) {
+        // Increase logo size and align with text
+        pdf.addImage(typeof logoBase64 === 'string' ? logoBase64 : String(logoBase64), 'JPEG', 18, headerY - 2, 50, 28);
+      }
+      pdf.setFontSize(22);
       pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(0, 0, 0);
-      pdf.text("CHENNAI", 45, y + 2);
-      pdf.text("INSTITUTE OF TECHNOLOGY", 45, y + 10);
+      // Center align college name
+      pdf.text("CHENNAI INSTITUTE OF TECHNOLOGY", pageWidth / 2, headerY + 8, { align: "center" });
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(
-        "(Autonomous Institution, Affiliated to Anna University, Chennai)",
-        45,
-        y + 16
-      );
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(
-        "OFFICE OF THE CONTROLLER OF EXAMINATIONS",
-        pageWidth / 2,
-        y + 28,
-        { align: "center" }
-      );
-
-      // Reference and date
+      pdf.text("(Autonomous Institution, Affiliated to Anna University, Chennai)", pageWidth / 2, headerY + 20, { align: "center" });
+      pdf.setFontSize(11);
+      pdf.text("OFFICE OF THE CONTROLLER OF EXAMINATIONS", pageWidth / 2, headerY + 30, { align: "center" });
+      // Reference and Date
       pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      // Use dynamic reference code and exam name if available, and get year/exam type from dropdowns
-      const refCode = selectedAlert?.referenceCode || "CIT/COE /2025-26/ODD/04";
-      // Get exam name from dropdown selection
-      let examName = "Internal Assessment";
-      if (selectedExam === "IA1") examName = "Internal Assessment-I";
-      else if (selectedExam === "IA2") examName = "Internal Assessment-II";
-      else if (selectedExam === "IA3") examName = "Internal Assessment-III";
-      // Get year text from dropdown selection
-      let yearText = "II year";
-      if (selectedYear === "3") yearText = "III year";
-      else if (selectedYear === "4") yearText = "IV year";
-      pdf.text(`REF: ${refCode}`, 12, y + 38);
-      // Use today's date for the circular
-      const today = new Date();
-      const dateStr = today.toLocaleDateString("en-GB");
-      pdf.text(`DATE: ${dateStr}`, pageWidth - 12, y + 38, { align: "right" });
-
+      pdf.text(`REF: CIT/COE /2025-26/ODD/04`, 18, headerY + 40);
+      pdf.text(`DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - 50, headerY + 40);
       // Circular title
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("CIRCULAR", pageWidth / 2, y + 48, { align: "center" });
+      pdf.text("CIRCULAR", pageWidth / 2, headerY + 45, { align: "center" });
+      y = headerY + 50;
 
-      // Circular content (dynamic start date, exam name, year)
+      // --- Circular content (dynamic, similar to preview page) ---
       pdf.setFontSize(11);
       pdf.setFont("helvetica", "normal");
-      // Find the earliest exam date for the selected year and exam type (supporting multiple key names)
+      // Find the earliest exam date for the selected year and exam type
       let minExamDate: Date | null = null;
       scheduledExams
         .filter((exam) => {
           const matchesYear = String(exam.year) === selectedYear;
-          const type = exam.examType || exam.exam_type; // support both keys
-          const matchesType = type ? type === selectedExam : true; // if type missing, don't exclude
+          const type = exam.examType || exam.exam_type;
+          const matchesType = type ? type === selectedExam : true;
           const hasDate = Boolean(exam.scheduledDate || exam.examDate);
           return matchesYear && matchesType && hasDate;
         })
@@ -228,12 +214,16 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         minExamDate && !isNaN((minExamDate as Date).getTime())
           ? (minExamDate as Date).toLocaleDateString("en-GB")
           : "____";
-      const circularText = `The ${examName} Exam for ${yearText} students starts from ${startDateStr} onwards. All the students are hereby informed to take the exams seriously. The marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
+      // Use selectedExam and selectedYear for circular text, match preview page wording
+      const examName = selectedExam === "IA1" ? "Internal Assessment-I" : selectedExam === "IA2" ? "Internal Assessment-II" : selectedExam === "IA3" ? "Internal Assessment-III" : selectedExam;
+      const yearText = selectedYear === "2" ? "II" : selectedYear === "3" ? "III" : selectedYear;
+      const circularText = `The ${examName} Exam for ${yearText} year students starts from ${startDateStr} onwards. All the students are hereby informed to take the exams seriously. The marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
       const lines = pdf.splitTextToSize(circularText, pageWidth - 40);
-      pdf.text(lines, 12, y + 56);
+      pdf.text(lines, 12, y + 8);
+
 
       // Dynamic Table
-      const tableY = y + 65;
+      const tableY = y + 20;
       const tableX = 12;
       const tableWidth = pageWidth - 24;
       // Dynamic department codes for headers (sorted by code)
@@ -379,7 +369,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     } finally {
       setGenerating(false);
     }
-  };
+  } // <-- Close generatePDF function properly
 
   return (
     <div className="space-y-6">
@@ -513,38 +503,20 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white">
-                      {(() => {
-                        const scheduleMap = new Map();
-                        filteredPreviewExams.forEach((exam) => {
-                          if (!exam.scheduledDate && !exam.examDate) return;
-                          const date = new Date(exam.scheduledDate || exam.examDate).toLocaleDateString("en-GB");
-                          if (!scheduleMap.has(date)) scheduleMap.set(date, {});
-                          scheduleMap.get(date)[exam.department] = exam;
-                        });
-
-                        const sortedDates = Array.from(scheduleMap.keys()).sort((a, b) => {
-                          const [da, ma, ya] = a.split("/").map(Number);
-                          const [db, mb, yb] = b.split("/").map(Number);
-                          return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
-                        });
-
-                        if (sortedDates.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={departments.length + 1} className="px-4 py-8 text-center text-gray-500">
-                                No exams scheduled yet
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return sortedDates.map((date) => (
+                      {previewSortedDates.length === 0 ? (
+                        <tr>
+                          <td colSpan={departments.length + 1} className="px-4 py-8 text-center text-gray-500">
+                            No exams scheduled yet
+                          </td>
+                        </tr>
+                      ) : (
+                        previewSortedDates.map((date) => (
                           <tr key={date} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border">
                               {date}
                             </td>
                             {departments.map((dept) => {
-                              const exam = scheduleMap.get(date)[dept.code];
+                              const exam = previewScheduleMap.get(date)[dept.code];
                               return (
                                 <td key={dept.code} className="px-4 py-3 text-sm text-center border">
                                   {exam ? (
@@ -559,8 +531,8 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                               );
                             })}
                           </tr>
-                        ));
-                      })()}
+                        ))
+                      )}
                       </tbody>
                     </table>
                   </div>
@@ -590,4 +562,4 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       </div>
     </div>
   );
-};
+}

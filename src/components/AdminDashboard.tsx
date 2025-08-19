@@ -102,6 +102,14 @@ export const AdminDashboard: React.FC = () => {
   // Helper functions to filter exams by year
   const examsYear2 = exams.filter((exam) => exam.year === 2);
   const examsYear3 = exams.filter((exam) => exam.year === 3);
+  // Debug: Log all exams and specifically CSE subjects for year 2 and 3
+  React.useEffect(() => {
+    console.log('[AdminDashboard] All exams:', exams);
+    const cseExamsYear2 = examsYear2.filter((exam) => exam.department === 'CSE');
+    const cseExamsYear3 = examsYear3.filter((exam) => exam.department === 'CSE');
+    console.log('[AdminDashboard] CSE exams for Year 2:', cseExamsYear2);
+    console.log('[AdminDashboard] CSE exams for Year 3:', cseExamsYear3);
+  }, [exams]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
