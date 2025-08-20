@@ -254,7 +254,7 @@ export const examService = {
     // Filter exams by department name and year to ensure correct comparison
     const sameDeptAndYearExams =
       sameDayExams?.filter(
-        (exam) => 
+        (exam) =>
           exam.departments?.name === currentDeptName &&
           exam.subject_detail?.year === currentYear
       ) || [];
@@ -268,7 +268,7 @@ export const examService = {
       allSameDayExams: sameDayExams,
     });
 
-    if (sameDeptAndYearExams.length > 0){
+    if (sameDeptAndYearExams.length > 0) {
       throw new Error(
         `${currentDeptName} department already has an exam scheduled for year ${currentYear} on ${examDate}. Cannot schedule multiple exams for the same department and year on the same day.`
       );
@@ -292,9 +292,10 @@ export const examService = {
     }
 
     // Filter conflicts to only include same year
-    const sameYearConflicts = timeConflicts?.filter(
-      conflict => conflict.subject_detail?.year === currentYear
-    ) || [];
+    const sameYearConflicts =
+      timeConflicts?.filter(
+        (conflict) => conflict.subject_detail?.year === currentYear
+      ) || [];
 
     if (sameYearConflicts.length > 0) {
       throw new Error(
@@ -591,6 +592,7 @@ export const examService = {
         .from("subject_detail")
         .select("*")
         .eq("name", subject.name)
+        .eq("year", subject.year)
         .neq("department", subject.department);
 
       if (otherDeptError) {
@@ -698,23 +700,20 @@ export const examService = {
 
   // Get scheduled exams for admin dashboard
   async getScheduledExams(year?: number): Promise<any[]> {
-    let query = supabase
-      .from("exam_schedules")
-      .select(
-        `
+    let query = supabase.from("exam_schedules").select(
+      `
         *,
         subject_detail(*),
         departments!exam_schedules_department_id_fkey(*)
       `
-      );
+    );
 
     // Filter by year if provided
     if (year !== undefined) {
-      query = query.eq('subject_detail.year', year);
+      query = query.eq("subject_detail.year", year);
     }
 
-    const { data, error } = await query
-      .order("exam_date", { ascending: true });
+    const { data, error } = await query.order("exam_date", { ascending: true });
 
     if (error) {
       throw new Error(error.message);
