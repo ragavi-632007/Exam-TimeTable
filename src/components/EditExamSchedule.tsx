@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Calendar, Save, AlertTriangle } from 'lucide-react';
 import { examService } from '../services/examService';
 
@@ -24,10 +24,23 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
     { value: 'IA3', label: 'Internal Assessment 3' }
   ];
 
+  const isSunday = (dateStr: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.getDay() === 0; // Sunday
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Disallow Sundays
+    if (isSunday(formData.examDate)) {
+      setLoading(false);
+      setError('Sunday is not allowed for exams. Please choose another date.');
+      return;
+    }
 
     try {
       // Update the exam schedule (swap logic handled in service)
@@ -54,6 +67,16 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
   };
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'examDate') {
+      // Validate Sunday
+      if (isSunday(value)) {
+        setError('Sunday is not allowed for exams. Please choose another date.');
+        setFormData(prev => ({ ...prev, examDate: '' }));
+        return;
+      } else {
+        setError(null);
+      }
+    }
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -111,6 +134,7 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
                 onChange={(e) => handleInputChange('examDate', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              <p className="text-xs text-gray-500 mt-1">Sundays are not allowed.</p>
             </div>
 
             <div>

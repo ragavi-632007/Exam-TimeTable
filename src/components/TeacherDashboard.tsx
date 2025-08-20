@@ -732,13 +732,15 @@ export const TeacherDashboard: React.FC = () => {
                                   <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
                                     Confirmed
                                   </span>
-                                  <button
-                                    onClick={() => setEditingSchedule(exam)}
-                                    className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                                    title="Edit Schedule"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </button>
+                                  {user?.role === "admin" && (
+                                    <button
+                                      onClick={() => setEditingSchedule(exam)}
+                                      className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                                      title="Edit Schedule"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -760,8 +762,8 @@ export const TeacherDashboard: React.FC = () => {
                     />
                   )}
 
-                  {/* Edit Exam Schedule Modal */}
-                  {editingSchedule && (
+                  {/* Edit Exam Schedule Modal (admins only) */}
+                  {user?.role === "admin" && editingSchedule && (
                     <EditExamSchedule
                       schedule={editingSchedule}
                       onClose={() => setEditingSchedule(null)}

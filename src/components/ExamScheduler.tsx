@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Calendar, AlertTriangle } from 'lucide-react';
 import { Exam } from '../types';
 import { useExams } from '../context/ExamContext';
 import { useAuth } from '../context/AuthContext';
+import DatePicker from 'react-datepicker';
+import { format } from 'date-fns';
 
 interface ExamSchedulerProps {
   exam: Exam;
@@ -17,6 +19,12 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
   const { exams, scheduleExam } = useExams();
   const { user } = useAuth();
   const [staffId, setStaffId] = useState<string | null>(null);
+  const scheduledDates = useMemo(() => new Set(
+    exams
+      .filter(e => e.status === 'scheduled' && e.department === exam.department && e.year === exam.year)
+      .map(e => e.scheduledDate)
+      .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+  ), [exams, exam.department, exam.year]);
 
   // Fetch staff_details.id for current user
   React.useEffect(() => {
@@ -57,24 +65,45 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
     }
   }, [user]);
 
+  const isSunday = (dateStr: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.getDay() === 0; // Sunday
+  };
+
+  const parseYMD = (dateStr?: string | null): Date | null => {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    // Expect yyyy-MM-dd
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
     setConflict(null); // Clear any previous errors or conflicts
-    
+
+    // Disallow Sundays
+    if (isSunday(date)) {
+      setSelectedDate('');
+      setConflict('Error: Sunday is not allowed for exams. Please choose another date.');
+      return;
+    }
+
     // Check for conflicts
     const scheduledExams = exams.filter(e => e.status === 'scheduled' && e.scheduledDate === date);
-    
+
     // Check for same department and year conflict
-    const sameDeptYearConflict = scheduledExams.find(e => 
-      e.department === exam.department && 
+    const sameDeptYearConflict = scheduledExams.find(e =>
+      e.department === exam.department &&
       e.year === exam.year
     );
-    
+
     if (sameDeptYearConflict) {
       setConflict(`Conflict: Another exam is already scheduled for ${exam.department} department year ${exam.year} on this date.`);
       return;
     }
-    
+
     // Check for same subject name scheduling opportunity
     const sameSubjectScheduled = scheduledExams.find(e => e.subjectName === exam.subjectName);
     if (sameSubjectScheduled) {
@@ -88,11 +117,13 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
     onClose();
   };
 
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedDate && !conflict?.includes('Conflict:') && user && user.id) {
+    if (isSunday(selectedDate)) {
+      setConflict('Error: Sunday is not allowed for exams. Please choose another date.');
+      return;
+    }
+    if (selectedDate && !conflict?.includes('Conflict:') && !conflict?.includes('Error:') && user && user.id) {
       setLoading(true);
       try {
         await scheduleExam(exam.id, selectedDate, user.id);
@@ -100,13 +131,13 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
         onClose();
       } catch (error: any) {
         console.error('Error scheduling exam:', error);
-        
+
         // Extract error message and handle specific cases
         let errorMessage = 'Failed to schedule exam. Please try again.';
-        
+
         if (error?.message) {
           errorMessage = error.message;
-          
+
           // Check for specific department conflict error
           if (errorMessage.includes('department already has an exam scheduled')) {
             setConflict(`Conflict: ${errorMessage}`);
@@ -151,30 +182,53 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
             </div>
           </div>
 
-
-
-                      {/* Date Selection */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="inline h-4 w-4 mr-1" />
-                  Select Exam Date
-                </label>
-                <input
-                  type="date"
-                  required
-                  min={exam.startDate}
-                  max={exam.endDate}
-                  value={selectedDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Must be between {exam.startDate} and {exam.endDate}
-                </p>
-              </div>
-
-
+          {/* Date Selection */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Calendar className="inline h-4 w-4 mr-1" />
+                Select Exam Date
+              </label>
+              {(() => {
+                const minParsed = parseYMD((exam as any).startDate);
+                const maxParsed = parseYMD((exam as any).endDate);
+                const minDate = minParsed;
+                const maxDate = maxParsed && minParsed && maxParsed >= minParsed ? maxParsed : (minParsed ? null : maxParsed);
+                const selected = selectedDate ? parseYMD(selectedDate) : null;
+                const isDisabled = (d: Date) => {
+                  const ds = format(d, 'yyyy-MM-dd');
+                  return d.getDay() === 0 || scheduledDates.has(ds);
+                };
+                // Choose an initial visible month within the valid range
+                const today = new Date();
+                let openTo = selected ?? (minDate ?? maxDate ?? today);
+                // Clamp openTo into [minDate, maxDate] if both exist
+                if (minDate && openTo < minDate) openTo = minDate;
+                if (maxDate && openTo > maxDate) openTo = maxDate;
+                return (
+                  <DatePicker
+                    selected={selected}
+                    onChange={(d: Date | null) => {
+                      const value = d ? format(d, 'yyyy-MM-dd') : '';
+                      handleDateChange(value);
+                    }}
+                    minDate={minDate ?? undefined}
+                    maxDate={maxDate ?? undefined}
+                    filterDate={(d: Date) => !isDisabled(d)}
+                    placeholderText="Select a date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    dateFormat="yyyy-MM-dd"
+                    inline={false}
+                    openToDate={openTo}
+                  />
+                );
+              })()}
+              <p className="text-xs text-gray-500 mt-1">
+                {((exam as any).startDate && (exam as any).endDate)
+                  ? `Must be between ${(exam as any).startDate} and ${(exam as any).endDate}. Sundays and already scheduled dates are disabled.`
+                  : `Sundays and already scheduled dates are disabled.`}
+              </p>
+            </div>
 
             {/* Conflict Notice */}
             {conflict && (
