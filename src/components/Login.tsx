@@ -1,29 +1,46 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { Navigate } from 'react-router-dom';
-import { GraduationCap, Lock, Mail, Eye, EyeOff, MapPin, Phone, Mail as MailIcon, Award, Building, BookOpen, Users, AlertCircle } from 'lucide-react';
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { Navigate } from "react-router-dom";
+import {
+  GraduationCap,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  MapPin,
+  Phone,
+  Mail as MailIcon,
+  Award,
+  Building,
+  BookOpen,
+  Users,
+  AlertCircle,
+} from "lucide-react";
 
 export const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, login } = useAuth();
 
   if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/teacher'} replace />;
+    return (
+      <Navigate to={user.role === "admin" ? "/admin" : "/teacher"} replace />
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login(email, password);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Invalid email or password';
+      const errorMessage =
+        err instanceof Error ? err.message : "Invalid email or password";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -41,8 +58,9 @@ export const Login: React.FC = () => {
               <span className="text-blue-900 font-bold text-xl">CIT</span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">Chennai Institute of Technology</h1>
-              <p className="text-blue-200 text-lg">Best Engineering College in Chennai</p>
+              <h1 className="text-3xl font-bold text-white">
+                Chennai Institute of Technology
+              </h1>
             </div>
           </div>
 
@@ -58,8 +76,9 @@ export const Login: React.FC = () => {
                 <Award className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-lg">Excellence in Education</h3>
-                <p className="text-blue-200">Providing quality technical education with industrial exposure.</p>
+                <h3 className="text-white font-semibold text-lg">
+                  Excellence in Education
+                </h3>
               </div>
             </div>
 
@@ -68,8 +87,12 @@ export const Login: React.FC = () => {
                 <Building className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-lg">14 Departments</h3>
-                <p className="text-blue-200">Comprehensive engineering programs across all disciplines.</p>
+                <h3 className="text-white font-semibold text-lg">
+                  14 Departments
+                </h3>
+                <p className="text-blue-200">
+                  Comprehensive engineering programs across all disciplines.
+                </p>
               </div>
             </div>
 
@@ -78,15 +101,18 @@ export const Login: React.FC = () => {
                 <BookOpen className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-lg">Research & Innovation</h3>
-                <p className="text-blue-200">State-of-the-art research centers and innovation hubs.</p>
+                <h3 className="text-white font-semibold text-lg">
+                  Research & Innovation
+                </h3>
+                <p className="text-blue-200">
+                  State-of-the-art research centers and innovation hubs.
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Contact Information */}
-        
       </div>
 
       {/* Right Panel - Login Form */}
@@ -98,7 +124,9 @@ export const Login: React.FC = () => {
               <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
                 <GraduationCap className="h-8 w-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Examination Management Portal</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Examination Management Portal
+              </h2>
               <p className="text-gray-600">Sign in to access your dashboard</p>
             </div>
 
@@ -124,7 +152,7 @@ export const Login: React.FC = () => {
                 </label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -136,7 +164,11 @@ export const Login: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -152,7 +184,7 @@ export const Login: React.FC = () => {
                 disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
@@ -170,7 +202,7 @@ export const Login: React.FC = () => {
             </div>
           </div>
         </div>
-      </div> 
+      </div>
     </div>
   );
 };
