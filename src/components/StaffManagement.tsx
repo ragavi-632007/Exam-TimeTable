@@ -98,16 +98,7 @@ export const StaffManagement: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
           <p className="text-sm text-gray-600">Manage staff members and their roles</p>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={refreshData}
-            disabled={loading}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors disabled:opacity-50"
-          >
-            <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-        </div>
+        
       </div>
 
       {/* Error Message */}
@@ -192,10 +183,7 @@ export const StaffManagement: React.FC = () => {
                              <Mail className="h-4 w-4 text-gray-400" />
                              <span className="text-sm text-gray-900">{staff.email}</span>
                            </div>
-                           <div className="flex items-center space-x-2">
-                             <Phone className="h-4 w-4 text-gray-400" />
-                             <span className="text-sm text-gray-900">{staff.phone}</span>
-                           </div>
+                           
                          </div>
                        </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

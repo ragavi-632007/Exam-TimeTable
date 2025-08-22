@@ -930,8 +930,9 @@ export const examService = {
       title: `Exam Settings - ${setting.exam_start_date} to ${setting.exam_end_date}`,
       startDate: setting.exam_start_date,
       endDate: setting.exam_end_date,
-      year: 2, // Use valid year type
-      semester: 3, // Use valid semester type
+      year: setting.year,
+      semester: setting.semester,
+      refId: setting.refid,
       departments: [], // Will need to be derived from other data
       status: "active",
       createdAt: setting.created_at,
@@ -945,8 +946,13 @@ export const examService = {
   ): Promise<ExamAlert> {
     const updateData: any = {};
 
-    if (updates.startDate) updateData.exam_start_date = updates.startDate;
-    if (updates.endDate) updateData.exam_end_date = updates.endDate;
+  if (updates.startDate) updateData.exam_start_date = updates.startDate;
+  if (updates.endDate) updateData.exam_end_date = updates.endDate;
+  if (updates.refId) updateData.refid = updates.refId;
+  if (updates.year) updateData.year = updates.year;
+  if (updates.semester) updateData.semester = updates.semester;
+  if ((updates as any).examType) updateData.exam_type = (updates as any).examType;
+  if ((updates as any).alertDate) updateData.alert_date = (updates as any).alertDate;
 
     const { data, error } = await supabase
       .from("exam_settings")
@@ -981,8 +987,11 @@ export const examService = {
   async createExamAlert(alertData: {
     startDate: string;
     endDate: string;
-    year: 2 | 3;
+    year: number;
     semester: number;
+    refId: string;
+    examType: string;
+    alertDate?: string;
     departments: string[];
     status: "active" | "closed";
     createdBy: string;
@@ -995,6 +1004,11 @@ export const examService = {
           exam_end_date: alertData.endDate,
           holidays: [],
           created_by: alertData.createdBy,
+          refid: alertData.refId,
+          year: alertData.year,
+          semester: alertData.semester,
+          exam_type: alertData.examType,
+          alert_date: alertData.alertDate || new Date().toISOString().slice(0, 10),
         },
       ])
       .select()
@@ -1009,8 +1023,8 @@ export const examService = {
       title: `Exam Settings - ${data.exam_start_date} to ${data.exam_end_date}`,
       startDate: data.exam_start_date,
       endDate: data.exam_end_date,
-      year: alertData.year,
-      semester: alertData.semester,
+      year: data.year,
+      semester: data.semester,
       departments: alertData.departments,
       status: alertData.status,
       createdAt: data.created_at,

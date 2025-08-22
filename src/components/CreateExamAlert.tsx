@@ -26,10 +26,31 @@ export const CreateExamAlert: React.FC<CreateExamAlertProps> = ({
     academicYear: "",
     startDate: "",
     endDate: "",
-    year: 2,
+    year: 1,
     semester: 1,
     refId: "",
+    deadline: "",
   });
+
+  // Map year to allowed semesters
+  const yearSemesterMap: Record<number, number[]> = {
+    1: [1, 2],
+    2: [3, 4],
+    3: [5, 6],
+    4: [7, 8],
+  };
+
+  // Semester labels
+  const semesterLabels: Record<number, string> = {
+    1: "Semester 1",
+    2: "Semester 2",
+    3: "Semester 3",
+    4: "Semester 4",
+    5: "Semester 5",
+    6: "Semester 6",
+    7: "Semester 7",
+    8: "Semester 8",
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,9 +63,12 @@ export const CreateExamAlert: React.FC<CreateExamAlertProps> = ({
         formData.title || `${formData.examType} - ${formData.academicYear}`,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      year: formData.year as 2 | 3,
+      year: formData.year,
       semester: formData.semester,
       refId: formData.refId,
+      examType: formData.examType,
+      alertDate: new Date().toISOString().slice(0, 10),
+      departments: [],
       status: "active" as const,
       createdBy: user.id,
     };
@@ -136,16 +160,21 @@ export const CreateExamAlert: React.FC<CreateExamAlertProps> = ({
               </label>
               <select
                 value={formData.year}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const newYear = Number(e.target.value);
+                  // Set semester to first valid for new year
                   setFormData((prev) => ({
                     ...prev,
-                    year: Number(e.target.value) as 2 | 3,
-                  }))
-                }
+                    year: newYear,
+                    semester: yearSemesterMap[newYear][0],
+                  }));
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
+                <option value={1}>1st Year</option>
                 <option value={2}>2nd Year</option>
                 <option value={3}>3rd Year</option>
+                <option value={4}>4th Year</option>
               </select>
             </div>
 
@@ -163,15 +192,11 @@ export const CreateExamAlert: React.FC<CreateExamAlertProps> = ({
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">Select Semester</option>
-                <option value={1}>Semester 1</option>
-                <option value={2}>Semester 2</option>
-                <option value={3}>Semester 3</option>
-                <option value={4}>Semester 4</option>
-                <option value={5}>Semester 5</option>
-                <option value={6}>Semester 6</option>
-                <option value={7}>Semester 7</option>
-                <option value={8}>Semester 8</option>
+                {yearSemesterMap[formData.year].map((sem) => (
+                  <option key={sem} value={sem}>
+                    {semesterLabels[sem]}
+                  </option>
+                ))}
               </select>
             </div>
 

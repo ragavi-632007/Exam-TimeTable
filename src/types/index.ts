@@ -31,8 +31,12 @@ export interface ExamAlert {
   title: string;
   startDate: string;
   endDate: string;
-  year: 2 | 3; // Only 2nd and 3rd years allowed
+  year: number;
   semester: number;
+  refId?: string;
+  examType?: string;
+  alertDate?: string;
+  deadline?: string;
   departments: string[];
   createdAt: string;
   status: 'active' | 'closed';

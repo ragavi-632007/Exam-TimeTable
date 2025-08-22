@@ -1,3 +1,22 @@
+  // Map year to allowed semesters
+  const yearSemesterMap: Record<number, number[]> = {
+    1: [1, 2],
+    2: [3, 4],
+    3: [5, 6],
+    4: [7, 8],
+  };
+
+  // Semester labels
+  const semesterLabels: Record<number, string> = {
+    1: "Semester 1",
+    2: "Semester 2",
+    3: "Semester 3",
+    4: "Semester 4",
+    5: "Semester 5",
+    6: "Semester 6",
+    7: "Semester 7",
+    8: "Semester 8",
+  };
 import React, { useState } from "react";
 import { X, Save, AlertTriangle, Calendar, Users } from "lucide-react";
 import { ExamAlert } from "../types";
@@ -21,6 +40,8 @@ export const EditExamAlert: React.FC<EditExamAlertProps> = ({
     year: alert.year,
     semester: alert.semester,
     refId: alert.refId || "",
+    examType: alert.examType || "",
+    alertDate: alert.alertDate || new Date().toISOString().slice(0, 10),
     deadline: alert.deadline || "",
   });
   const [loading, setLoading] = useState(false);
@@ -40,6 +61,8 @@ export const EditExamAlert: React.FC<EditExamAlertProps> = ({
         year: formData.year,
         semester: formData.semester,
         refId: formData.refId,
+        examType: formData.examType,
+        alertDate: formData.alertDate,
         deadline: formData.deadline,
       });
 
@@ -108,6 +131,33 @@ export const EditExamAlert: React.FC<EditExamAlertProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Exam Type
+                </label>
+                <select
+                  value={formData.examType}
+                  onChange={(e) => handleInputChange("examType", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select Exam Type</option>
+                  <option value="Internal Assessment-I">Internal Assessment-I</option>
+                  <option value="Internal Assessment-II">Internal Assessment-II</option>
+                  <option value="Model Exam">Model Exam</option>
+                  <option value="End Semester">End Semester</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alert Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.alertDate}
+                  onChange={(e) => handleInputChange("alertDate", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline h-4 w-4 mr-1" />
                   Start Date
                 </label>
@@ -144,15 +194,18 @@ export const EditExamAlert: React.FC<EditExamAlertProps> = ({
                 </label>
                 <select
                   value={formData.year}
-                  onChange={(e) =>
-                    handleInputChange("year", parseInt(e.target.value))
-                  }
+                  onChange={(e) => {
+                    const newYear = Number(e.target.value);
+                    handleInputChange("year", newYear);
+                    // Set semester to first valid for new year
+                    handleInputChange("semester", yearSemesterMap[newYear][0]);
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value={1}>I Year</option>
-                  <option value={2}>II Year</option>
-                  <option value={3}>III Year</option>
-                  <option value={4}>IV Year</option>
+                  <option value={1}>1st Year</option>
+                  <option value={2}>2nd Year</option>
+                  <option value={3}>3rd Year</option>
+                  <option value={4}>4th Year</option>
                 </select>
               </div>
 
@@ -167,14 +220,11 @@ export const EditExamAlert: React.FC<EditExamAlertProps> = ({
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value={1}>Semester 1</option>
-                  <option value={2}>Semester 2</option>
-                  <option value={3}>Semester 3</option>
-                  <option value={4}>Semester 4</option>
-                  <option value={5}>Semester 5</option>
-                  <option value={6}>Semester 6</option>
-                  <option value={7}>Semester 7</option>
-                  <option value={8}>Semester 8</option>
+                  {yearSemesterMap[formData.year]?.map((sem) => (
+                    <option key={sem} value={sem}>
+                      {semesterLabels[sem]}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
