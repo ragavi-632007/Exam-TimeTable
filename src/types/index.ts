@@ -12,9 +12,9 @@ export interface Exam {
   subjectName: string;
   courseId: string;
   department: string;
-  year: 2 | 3; // Only 2nd and 3rd years allowed
+  year: 1 | 2 | 3 | 4;
   subject_detail?: {
-    year: 2 | 3;
+    year: 1 | 2 | 3 | 4;
   };
   semester: number;
   examType?: 'IA1' | 'IA2' | 'IA3';
@@ -31,7 +31,7 @@ export interface ExamAlert {
   title: string;
   startDate: string;
   endDate: string;
-  year: 2 | 3; // Only 2nd and 3rd years allowed
+  year: 1 | 2 | 3 | 4;
   semester: number;
   departments: string[];
   createdAt: string;

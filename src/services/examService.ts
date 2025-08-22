@@ -92,7 +92,8 @@ export const examService = {
       courseId: subject.subcode, // Using subcode as courseId
       department: subject.department,
       year: subject.year,
-      semester: 8, // Default semester since it's not in your schema
+      // Prefer 'sem' if present, else 'semester' field, else undefined
+      semester: subject.sem ?? subject.semester ?? undefined,
       teacherId: "", // Will be set from exam_schedules
       teacherName: "", // Will be set from exam_schedules
       scheduledDate: subject.exam_schedules?.[0]?.exam_date || null,
@@ -136,7 +137,7 @@ export const examService = {
       courseId: subject.subcode,
       department: subject.department,
       year: subject.year,
-      semester: 8,
+      semester: subject.sem ?? subject.semester ?? undefined,
       teacherId: teacherId,
       teacherName: "", // Will need to fetch from staff_details
       scheduledDate: subject.exam_schedules?.[0]?.exam_date || null,
@@ -797,7 +798,7 @@ export const examService = {
       courseId: data.subcode,
       department: data.department,
       year: data.year,
-      semester: 8,
+      semester: (data as any).sem ?? (data as any).semester ?? undefined,
       teacherId: examData.teacherId,
       teacherName: examData.teacherName,
       scheduledDate: examData.scheduledDate,
@@ -892,7 +893,7 @@ export const examService = {
       courseId: data.subcode,
       department: data.department,
       year: data.year,
-      semester: 8,
+      semester: (data as any).sem ?? (data as any).semester ?? undefined,
       teacherId: updates.teacherId || "",
       teacherName: updates.teacherName || "",
       scheduledDate: updates.scheduledDate || undefined,

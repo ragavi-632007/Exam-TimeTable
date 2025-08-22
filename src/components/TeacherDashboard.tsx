@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useExams } from "../context/ExamContext";
-import { Exam } from "../types";
+import { Exam, ExamAlert } from "../types";
 import {
   Calendar,
   Clock,
@@ -22,12 +22,13 @@ import { examService } from "../services/examService";
 
 export const TeacherDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const { exams, scheduledExams, loading, refreshExams, refreshScheduledExams } = useExams();
+  const { exams, scheduledExams, loading, refreshExams, refreshScheduledExams, alerts: ctxAlerts } = useExams();
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "subjects" | "schedule" | "timetable"
   >("dashboard");
-  const [selectedYear, setSelectedYear] = useState<2 | 3>(2);
+  const [selectedYear, setSelectedYear] = useState<1 | 2 | 3 | 4>(2);
+  const [selectedSemester, setSelectedSemester] = useState<number>(3);
   const [selectedExamType, setSelectedExamType] = useState<
     "IA1" | "IA2" | "IA3"
   >("IA1");
@@ -36,6 +37,7 @@ export const TeacherDashboard: React.FC = () => {
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [examStartDate, setExamStartDate] = useState<string>("");
   const [examEndDate, setExamEndDate] = useState<string>("");
+  const [alerts, setAlerts] = useState<ExamAlert[]>([]);
 
   // Log when ExamScheduler modal is opened
   useEffect(() => {
@@ -53,21 +55,21 @@ export const TeacherDashboard: React.FC = () => {
     { value: "IA3", label: "Internal Assessment 3" },
   ];
 
-  // Load exam alerts to get exam period dates
+  // Use alerts from context; exam_settings is global (no per-dept/year), so just expose dates
   useEffect(() => {
-    const fetchExamAlerts = async () => {
-      try {
-        const examAlerts = await examService.getExamAlerts();
-        if (examAlerts && examAlerts.length > 0) {
-          setExamStartDate(examAlerts[0].startDate || "");
-          setExamEndDate(examAlerts[0].endDate || "");
-        }
-      } catch (err) {
-        console.error("Error fetching exam alerts:", err);
-      }
-    };
-    fetchExamAlerts();
-  }, []);
+    setAlerts(ctxAlerts || []);
+    if (ctxAlerts && ctxAlerts.length > 0) {
+      setExamStartDate(ctxAlerts[0].startDate || "");
+      setExamEndDate(ctxAlerts[0].endDate || "");
+    }
+  }, [ctxAlerts]);
+
+  // Ensure semester options follow the selected year
+  useEffect(() => {
+    // Default to first semester for the chosen year
+    const defaultSem = selectedYear === 1 ? 1 : selectedYear === 2 ? 3 : selectedYear === 3 ? 5 : 7;
+    setSelectedSemester(defaultSem);
+  }, [selectedYear]);
 
   // Only show subjects for the teacher's department (case-insensitive and trim whitespace)
   const departmentSubjects = exams.filter(
@@ -78,6 +80,38 @@ export const TeacherDashboard: React.FC = () => {
   
   const pendingExams = departmentSubjects.filter(
     (exam: any) => exam.status === "pending"
+  );
+  
+  // Per-year scoped arrays for the teacher's department
+  const deptYear1Subjects = departmentSubjects.filter((e: any) => e.year === 1);
+  const deptYear2Subjects = departmentSubjects.filter((e: any) => e.year === 2);
+  const deptYear3Subjects = departmentSubjects.filter((e: any) => e.year === 3);
+  const deptYear4Subjects = departmentSubjects.filter((e: any) => e.year === 4);
+
+  const scheduledDeptYear1 = scheduledExams.filter(
+    (e: any) => e.year === 1 && e.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
+  );
+  const scheduledDeptYear2 = scheduledExams.filter(
+    (e: any) => e.year === 2 && e.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
+  );
+  const scheduledDeptYear3 = scheduledExams.filter(
+    (e: any) => e.year === 3 && e.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
+  );
+  const scheduledDeptYear4 = scheduledExams.filter(
+    (e: any) => e.year === 4 && e.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
+  );
+
+  const alertsYear1 = alerts.filter(
+    (a) => a.year === 1 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+  );
+  const alertsYear2 = alerts.filter(
+    (a) => a.year === 2 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+  );
+  const alertsYear3 = alerts.filter(
+    (a) => a.year === 3 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+  );
+  const alertsYear4 = alerts.filter(
+    (a) => a.year === 4 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
   );
 
   const handleUpdateSchedule = async () => {
@@ -351,32 +385,308 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {stats.map((stat, index) => (
-                      <div
-                        key={index}
-                        className="bg-white rounded-lg shadow-sm p-6"
-                      >
+                  {/* Year 1 Stats */}
+                  <div className="mb-8 w-full">
+                    <h2 className="text-lg font-semibold mb-2 text-black">Year 1 Statistics</h2>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Scheduled Exams */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
-                          <div className={`p-3 rounded-lg ${stat.color}`}>
-                            <stat.icon className="h-6 w-6" />
+                          <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                            <Calendar className="h-6 w-6" />
                           </div>
                         </div>
                         <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900">
-                            {stat.value}
-                          </p>
-                          <p className="text-sm text-gray-600">{stat.label}</p>
+                          <p className="text-3xl font-bold text-gray-900">{scheduledDeptYear1.length}</p>
+                          <p className="text-sm text-gray-600">Scheduled Exams</p>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${stat.progress}%` }}
+                            style={{ width: `${Math.min(scheduledDeptYear1.length * 10, 100)}%` }}
                           ></div>
                         </div>
                       </div>
-                    ))}
+
+                      {/* Completion Rate */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">
+                            {deptYear1Subjects.length > 0
+                              ? `${Math.round((scheduledDeptYear1.length / deptYear1Subjects.length) * 100)}%`
+                              : "0%"}
+                          </p>
+                          <p className="text-sm text-gray-600">Completion Rate</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${deptYear1Subjects.length > 0 ? Math.min((scheduledDeptYear1.length / deptYear1Subjects.length) * 100, 100) : 0}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Alerts Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                            <AlertTriangle className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{alertsYear1.length}</p>
+                          <p className="text-sm text-gray-600">Total Alerts</p>
+                        </div>
+                      </div>
+
+                      {/* Subjects Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                            <BookOpen className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{deptYear1Subjects.length}</p>
+                          <p className="text-sm text-gray-600">Total Subjects</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Year 2 Stats */}
+                  <div className="w-full">
+                    <h2 className="text-lg font-semibold mb-2 text-black">Year 2 Statistics</h2>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Scheduled Exams */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                            <Calendar className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{scheduledDeptYear2.length}</p>
+                          <p className="text-sm text-gray-600">Scheduled Exams</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(scheduledDeptYear2.length * 10, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Completion Rate */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">
+                            {deptYear2Subjects.length > 0
+                              ? `${Math.round((scheduledDeptYear2.length / deptYear2Subjects.length) * 100)}%`
+                              : "0%"}
+                          </p>
+                          <p className="text-sm text-gray-600">Completion Rate</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${deptYear2Subjects.length > 0 ? Math.min((scheduledDeptYear2.length / deptYear2Subjects.length) * 100, 100) : 0}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Alerts Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                            <AlertTriangle className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{alertsYear2.length}</p>
+                          <p className="text-sm text-gray-600">Total Alerts</p>
+                        </div>
+                      </div>
+
+                      {/* Subjects Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                            <BookOpen className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{deptYear2Subjects.length}</p>
+                          <p className="text-sm text-gray-600">Total Subjects</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Year 3 Stats */}
+                  <div className="w-full">
+                    <h2 className="text-lg font-semibold mb-2 text-black">Year 3 Statistics</h2>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Scheduled Exams */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                            <Calendar className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{scheduledDeptYear3.length}</p>
+                          <p className="text-sm text-gray-600">Scheduled Exams</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(scheduledDeptYear3.length * 10, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Completion Rate */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">
+                            {deptYear3Subjects.length > 0
+                              ? `${Math.round((scheduledDeptYear3.length / deptYear3Subjects.length) * 100)}%`
+                              : "0%"}
+                          </p>
+                          <p className="text-sm text-gray-600">Completion Rate</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${deptYear3Subjects.length > 0 ? Math.min((scheduledDeptYear3.length / deptYear3Subjects.length) * 100, 100) : 0}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Alerts Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                            <AlertTriangle className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{alertsYear3.length}</p>
+                          <p className="text-sm text-gray-600">Total Alerts</p>
+                        </div>
+                      </div>
+
+                      {/* Subjects Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                            <BookOpen className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{deptYear3Subjects.length}</p>
+                          <p className="text-sm text-gray-600">Total Subjects</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Year 4 Stats */}
+                  <div className="w-full">
+                    <h2 className="text-lg font-semibold mb-2 text-black">Year 4 Statistics</h2>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Scheduled Exams */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                            <Calendar className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{scheduledDeptYear4.length}</p>
+                          <p className="text-sm text-gray-600">Scheduled Exams</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(scheduledDeptYear4.length * 10, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Completion Rate */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">
+                            {deptYear4Subjects.length > 0
+                              ? `${Math.round((scheduledDeptYear4.length / deptYear4Subjects.length) * 100)}%`
+                              : "0%"}
+                          </p>
+                          <p className="text-sm text-gray-600">Completion Rate</p>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${deptYear4Subjects.length > 0 ? Math.min((scheduledDeptYear4.length / deptYear4Subjects.length) * 100, 100) : 0}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Alerts Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                            <AlertTriangle className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{alertsYear4.length}</p>
+                          <p className="text-sm text-gray-600">Total Alerts</p>
+                        </div>
+                      </div>
+
+                      {/* Subjects Stat */}
+                      <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                            <BookOpen className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900">{deptYear4Subjects.length}</p>
+                          <p className="text-sm text-gray-600">Total Subjects</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Content Sections */}
@@ -440,39 +750,62 @@ export const TeacherDashboard: React.FC = () => {
                       <select
                         value={selectedYear}
                         onChange={(e) =>
-                          setSelectedYear(Number(e.target.value) as 2 | 3)
+                          setSelectedYear(Number(e.target.value) as 1 | 2 | 3 | 4)
                         }
                         className="form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
                       >
+                        <option value={1}>I Year</option>
                         <option value={2}>II Year</option>
                         <option value={3}>III Year</option>
+                        <option value={4}>IV Year</option>
+                      </select>
+                      <label className="text-sm font-medium text-gray-700">
+                        Select Semester:
+                      </label>
+                      <select
+                        value={selectedSemester}
+                        onChange={(e) => setSelectedSemester(Number(e.target.value))}
+                        className="form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {(selectedYear === 1
+                          ? [1, 2]
+                          : selectedYear === 2
+                          ? [3, 4]
+                          : selectedYear === 3
+                          ? [5, 6]
+                          : [7, 8]
+                        ).map((sem) => (
+                          <option key={sem} value={sem}>
+                            Semester {sem}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
                   <div className="bg-white rounded-lg shadow-sm">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h3 className="text-lg font-medium text-gray-900">
-                        Available Subjects for Year {selectedYear} (
+                        Available Subjects for Year {selectedYear}, Semester {selectedSemester} (
                         {
-                          departmentSubjects.filter(
-                            (subj: any) => subj.year === selectedYear
-                          ).length
-                        }
+                        departmentSubjects.filter(
+                          (subj: any) => subj.year === selectedYear && (subj.semester == null || subj.semester === selectedSemester)
+                        ).length
+                      }
                         )
                       </h3>
                     </div>
                     {departmentSubjects.filter(
-                      (subj: any) => subj.year === selectedYear
+                      (subj: any) => subj.year === selectedYear && (subj.semester == null || subj.semester === selectedSemester)
                     ).length === 0 ? (
                       <div className="px-6 py-8 text-center">
                         <p className="text-gray-500">
-                          No subjects available for Year {selectedYear}
+                          No subjects available for Year {selectedYear}, Semester {selectedSemester}
                         </p>
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-200">
                         {departmentSubjects
-                          .filter((subj: any) => subj.year === selectedYear)
+                          .filter((subj: any) => subj.year === selectedYear && (subj.semester == null || subj.semester === selectedSemester))
                           .map((subj) => (
                             <div key={subj.id} className="px-6 py-4">
                               <div className="flex items-center justify-between">
@@ -583,15 +916,39 @@ export const TeacherDashboard: React.FC = () => {
                           <select
                             value={selectedYear}
                             onChange={(e) =>
-                              setSelectedYear(Number(e.target.value) as 2 | 3)
+                              setSelectedYear(Number(e.target.value) as 1 | 2 | 3 | 4)
                             }
                             className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
                           >
+                            <option value={1}>I Year</option>
                             <option value={2}>II Year</option>
                             <option value={3}>III Year</option>
+                            <option value={4}>IV Year</option>
                           </select>
                         </div>
-
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Semester:
+                          </label>
+                          <select
+                            value={selectedSemester}
+                            onChange={(e) => setSelectedSemester(Number(e.target.value))}
+                            className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            {(selectedYear === 1
+                              ? [1, 2]
+                              : selectedYear === 2
+                              ? [3, 4]
+                              : selectedYear === 3
+                              ? [5, 6]
+                              : [7, 8]
+                            ).map((sem) => (
+                              <option key={sem} value={sem}>
+                                Semester {sem}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Select Exam Type:
@@ -625,7 +982,7 @@ export const TeacherDashboard: React.FC = () => {
                           Exams Requiring Schedule (
                           {
                             pendingExams.filter(
-                              (exam: any) => exam.year === selectedYear
+                              (exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester)
                             ).length
                           }
                           )
@@ -634,17 +991,17 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
 
                     {pendingExams.filter(
-                      (exam: any) => exam.year === selectedYear
+                      (exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester)
                     ).length === 0 ? (
                       <div className="px-6 py-8 text-center">
                         <p className="text-gray-500">
-                          No pending exams to schedule for Year {selectedYear}
+                          No pending exams to schedule for Year {selectedYear}, Semester {selectedSemester}
                         </p>
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-200">
                         {pendingExams
-                          .filter((exam: any) => exam.year === selectedYear)
+                          .filter((exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester))
                           .map((exam: any) => (
                             <div key={exam.id} className="px-6 py-4">
                               <div className="flex items-center justify-between">
@@ -694,17 +1051,17 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
 
                     {scheduledExams
-                      .filter((exam) => exam.year === selectedYear && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
+                      .filter((exam) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester) && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
                       .length === 0 ? (
                       <div className="px-6 py-8 text-center">
                         <p className="text-gray-500">
-                          No scheduled exams yet for Year {selectedYear}
+                          No scheduled exams yet for Year {selectedYear}, Semester {selectedSemester}
                         </p>
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-200">
                         {scheduledExams
-                          .filter((exam) => exam.year === selectedYear && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
+                          .filter((exam) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester) && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
                           .map((exam) => (
                             <div key={exam.id} className="px-6 py-4">
                               <div className="flex items-center justify-between">
