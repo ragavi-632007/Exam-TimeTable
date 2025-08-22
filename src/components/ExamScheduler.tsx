@@ -11,6 +11,7 @@ interface ExamSchedulerProps {
   onClose: () => void;
   onSchedule: (examId: string, date: string) => void;
 }
+console.log("Hello!!!")
 
 export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onSchedule }) => {
   const [selectedDate, setSelectedDate] = useState('');
@@ -119,6 +120,7 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (isSunday(selectedDate)) {
       setConflict('Error: Sunday is not allowed for exams. Please choose another date.');
       return;
@@ -126,19 +128,13 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
     if (selectedDate && !conflict?.includes('Conflict:') && !conflict?.includes('Error:') && user && user.id) {
       setLoading(true);
       try {
-        await scheduleExam(exam.id, selectedDate, user.id);
-        onSchedule(exam.id, selectedDate);
+        await onSchedule(exam.id, selectedDate);
         onClose();
       } catch (error: any) {
         console.error('Error scheduling exam:', error);
-
-        // Extract error message and handle specific cases
         let errorMessage = 'Failed to schedule exam. Please try again.';
-
         if (error?.message) {
           errorMessage = error.message;
-
-          // Check for specific department conflict error
           if (errorMessage.includes('department already has an exam scheduled')) {
             setConflict(`Conflict: ${errorMessage}`);
           } else {
