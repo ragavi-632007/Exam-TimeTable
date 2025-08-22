@@ -11,6 +11,7 @@ interface ExamSchedulerProps {
   onClose: () => void;
   onSchedule: (examId: string, date: string) => void;
 }
+console.log("Hello!!!")
 
 export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onSchedule }) => {
   const [selectedDate, setSelectedDate] = useState('');
