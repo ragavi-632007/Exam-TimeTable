@@ -11,7 +11,6 @@ import {
   Plus,
   Download,
   Home,
-  Building,
   LogOut,
   Edit,
 } from "lucide-react";
@@ -28,8 +27,10 @@ export const AdminDashboard: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [alerts, setAlerts] = useState<ExamAlert[]>([]);
   // Separate alerts by year (must be after alerts state is defined)
+  const alertsYear1 = alerts.filter((a) => a.year === 1);
   const alertsYear2 = alerts.filter((a) => a.year === 2);
   const alertsYear3 = alerts.filter((a) => a.year === 3);
+  const alertsYear4 = alerts.filter((a) => a.year === 4);
   // Fetch all subjects on mount
   React.useEffect(() => {
     const fetchSubjects = async () => {
@@ -100,8 +101,10 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // Helper functions to filter exams by year
+  const examsYear1 = exams.filter((exam) => exam.year === 1);
   const examsYear2 = exams.filter((exam) => exam.year === 2);
   const examsYear3 = exams.filter((exam) => exam.year === 3);
+  const examsYear4 = exams.filter((exam) => exam.year === 4);
   // Debug: Log all exams and specifically CSE subjects for year 2 and 3
   React.useEffect(() => {
     console.log('[AdminDashboard] All exams:', exams);
@@ -312,7 +315,97 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {/* Stats Cards for Year 2 and Year 3, Alerts, and Subjects */}
+              {/* Stats Cards for Year 1, Year 2, Year 3, and Year 4 */}
+              {/* Year 1 Stats */}
+              <div className="mb-8 w-full">
+                <h2 className="text-lg font-semibold mb-2 text-black">
+                  Year 1 Statistics
+                </h2>
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Scheduled Exams */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear1.filter((exam) => exam.status === "scheduled").length}
+                      </p>
+                      <p className="text-sm text-gray-600">Scheduled Exams</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            examsYear1.filter((exam) => exam.status === "scheduled").length * 10,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Completion Rate */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear1.length > 0
+                          ? `${Math.round(
+                              (examsYear1.filter((exam) => exam.status === "scheduled").length / examsYear1.length) * 100
+                            )}%`
+                          : "0%"}
+                      </p>
+                      <p className="text-sm text-gray-600">Completion Rate</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            examsYear1.length > 0
+                              ? Math.min(
+                                  (examsYear1.filter((exam) => exam.status === "scheduled").length / examsYear1.length) * 100,
+                                  100
+                                )
+                              : 0
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Alerts Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">{alertsYear1.length}</p>
+                      <p className="text-sm text-gray-600">Total Alerts</p>
+                    </div>
+                  </div>
+                  {/* Subjects Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                        <Users className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">{subjects.filter((s) => s.year === 1).length}</p>
+                      <p className="text-sm text-gray-600">Total Subjects</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
               {/* Year 2 Stats */}
               <div className="mb-8 w-full">
                 <h2 className="text-lg font-semibold mb-2 text-black">
@@ -524,6 +617,94 @@ export const AdminDashboard: React.FC = () => {
                       <p className="text-3xl font-bold text-gray-900">
                         {subjects.filter((s) => s.year === 3).length}
                       </p>
+                      <p className="text-sm text-gray-600">Total Subjects</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Year 4 Stats */}
+              <div className="w-full">
+                <h2 className="text-lg font-semibold mb-2 text-black">Year 4 Statistics</h2>
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Scheduled Exams */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-green-600 bg-green-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear4.filter((exam) => exam.status === "scheduled").length}
+                      </p>
+                      <p className="text-sm text-gray-600">Scheduled Exams</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            examsYear4.filter((exam) => exam.status === "scheduled").length * 10,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Completion Rate */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-purple-600 bg-purple-100">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">
+                        {examsYear4.length > 0
+                          ? `${Math.round(
+                              (examsYear4.filter((exam) => exam.status === "scheduled").length / examsYear4.length) * 100
+                            )}%`
+                          : "0%"}
+                      </p>
+                      <p className="text-sm text-gray-600">Completion Rate</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            examsYear4.length > 0
+                              ? Math.min(
+                                  (examsYear4.filter((exam) => exam.status === "scheduled").length / examsYear4.length) * 100,
+                                  100
+                                )
+                              : 0
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Alerts Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-orange-600 bg-orange-100">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">{alertsYear4.length}</p>
+                      <p className="text-sm text-gray-600">Total Alerts</p>
+                    </div>
+                  </div>
+                  {/* Subjects Stat */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-lg text-blue-600 bg-blue-100">
+                        <Users className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-3xl font-bold text-gray-900">{subjects.filter((s) => s.year === 4).length}</p>
                       <p className="text-sm text-gray-600">Total Subjects</p>
                     </div>
                   </div>

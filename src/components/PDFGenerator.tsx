@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 
 import { examService } from "../services/examService";
 import { departmentService } from "../services/departmentService";
+import { useExams } from "../context/ExamContext";
 
 // Define departments for PDF generation (fallback if API fails)
 const defaultDepartments = [
@@ -43,6 +44,103 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   const [departments, setDepartments] = useState(defaultDepartments);
   const [loading, setLoading] = useState(true);
+  const { alerts } = useExams();
+
+  // Compute dynamic REF from the latest matching alert (by alertDate or createdAt)
+  const dynamicRefId = useMemo(() => {
+    if (!alerts || alerts.length === 0) return null;
+    const yearNum = Number(selectedYear);
+    const semNum = selectedSemester ? Number(selectedSemester) : null;
+    const typeSel = selectedExam;
+    // Prefer alerts matching selected year (and semester if chosen)
+    const candidates = alerts
+      .filter((a: any) => (isNaN(yearNum) ? true : Number(a.year) === yearNum))
+      .filter((a: any) => (semNum == null ? true : Number(a.semester) === semNum))
+      .filter((a: any) => {
+        const t = a.examType || a.exam_type;
+        return t ? t === typeSel : true;
+      });
+    const byDate = (a: any) => new Date(a.alertDate || a.createdAt || 0).getTime();
+    const match = candidates.length
+      ? candidates.slice().sort((x, y) => byDate(y) - byDate(x))[0]
+      : null; // Do NOT fallback to other years
+    return match?.refId || null;
+  }, [alerts, selectedYear, selectedSemester, selectedExam]);
+  // Find the latest matching alert for dynamic sentence pieces (exam type + year)
+  const matchedAlert = useMemo(() => {
+    if (!alerts || alerts.length === 0) return null;
+    const yearNum = Number(selectedYear);
+    const semNum = selectedSemester ? Number(selectedSemester) : null;
+    const typeSel = selectedExam;
+    const candidates = alerts
+      .filter((a: any) => (isNaN(yearNum) ? true : Number(a.year) === yearNum))
+      .filter((a: any) => (semNum == null ? true : Number(a.semester) === semNum))
+      .filter((a: any) => {
+        const t = a.examType || a.exam_type;
+        return t ? t === typeSel : true;
+      });
+    const byDate = (a: any) => new Date(a.alertDate || a.createdAt || 0).getTime();
+    return candidates.length ? candidates.slice().sort((x, y) => byDate(y) - byDate(x))[0] : null;
+  }, [alerts, selectedYear, selectedSemester, selectedExam]);
+
+  // Sync filters from the matched alert when available to avoid empty previews due to mismatched filters
+  useEffect(() => {
+    if (!matchedAlert) return;
+    const aType = (matchedAlert as any).examType || (matchedAlert as any).exam_type;
+    const aYear = (matchedAlert as any).year;
+    const aSem = (matchedAlert as any).semester;
+    // Apply exam type
+    if (aType && aType !== selectedExam) setSelectedExam(aType);
+    // Apply year
+    if (aYear && String(aYear) !== selectedYear) setSelectedYear(String(aYear));
+    // Apply semester if valid for that year
+    if (aSem != null) {
+      const semStr = String(aSem);
+      if (semStr !== selectedSemester) setSelectedSemester(semStr);
+    }
+  }, [matchedAlert]);
+
+  // Compute dynamic Start Date from alerts (fallback when no scheduled exams yet)
+  const dynamicStartDate = useMemo(() => {
+    if (!alerts || alerts.length === 0) return null;
+    const yearNum = Number(selectedYear);
+    const semNum = selectedSemester ? Number(selectedSemester) : null;
+    const typeSel = selectedExam;
+    const candidates = alerts
+      .filter((a: any) => (isNaN(yearNum) ? true : Number(a.year) === yearNum))
+      .filter((a: any) => (semNum == null ? true : Number(a.semester) === semNum))
+      .filter((a: any) => {
+        const t = a.examType || a.exam_type;
+        return t ? t === typeSel : true;
+      })
+      .filter((a: any) => !!(a.startDate || a.exam_start_date));
+    const byDate = (a: any) => new Date(a.alertDate || a.createdAt || a.startDate || a.exam_start_date || 0).getTime();
+    const latest = candidates.length
+      ? candidates.slice().sort((x, y) => byDate(y) - byDate(x))[0]
+      : null; // Do NOT fallback to other years
+    const raw = (latest?.startDate || (latest as any)?.exam_start_date) as string | undefined;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-GB");
+  }, [alerts, selectedYear, selectedSemester, selectedExam]);
+
+  // Reset semester if it becomes invalid for the selected year
+  useEffect(() => {
+    const allowed =
+      selectedYear === "1"
+        ? ["1", "2"]
+        : selectedYear === "2"
+        ? ["3", "4"]
+        : selectedYear === "3"
+        ? ["5", "6"]
+        : selectedYear === "4"
+        ? ["7", "8"]
+        : [];
+    if (selectedSemester && !allowed.includes(selectedSemester)) {
+      setSelectedSemester("");
+    }
+  }, [selectedYear]);
 
   // Compute the first (earliest) scheduled date for the preview based on filters
   // Removed unused firstPreviewDate
@@ -51,15 +149,20 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const previewScheduleMap = useMemo(() => {
     const map = new Map();
     scheduledExams.forEach((exam) => {
-      if (!exam.scheduledDate || !exam.department) return;
-      if (String(exam.year) !== selectedYear) return;
+      const dateRaw = (exam.scheduledDate || exam.examDate) as string | undefined;
+      if (!dateRaw || !exam.department) return;
+      const examYear = Number(exam.year ?? exam.subject_detail?.year);
+      if (String(examYear) !== selectedYear) return;
       if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
-      const date = new Date(exam.scheduledDate).toLocaleDateString("en-GB");
+      // Match selected exam type if available
+      const type = exam.examType || exam.exam_type;
+      if (type !== selectedExam) return; // require exact match
+      const date = new Date(dateRaw).toLocaleDateString("en-GB");
       if (!map.has(date)) map.set(date, {});
       map.get(date)[exam.department] = exam;
     });
     return map;
-  }, [scheduledExams, selectedYear, selectedSemester]);
+  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
   const previewSortedDates = Array.from(previewScheduleMap.keys()).sort((a, b) => {
     const [da, ma, ya] = a.split("/").map(Number);
     const [db, mb, yb] = b.split("/").map(Number);
@@ -180,7 +283,8 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       pdf.text("OFFICE OF THE CONTROLLER OF EXAMINATIONS", pageWidth / 2, headerY + 30, { align: "center" });
       // Reference and Date
       pdf.setFontSize(10);
-      pdf.text(`REF: CIT/COE /2025-26/ODD/04`, 18, headerY + 40);
+      const refText = dynamicRefId ? `REF: ${dynamicRefId}` : `REF: CIT/COE /____/____/____`;
+      pdf.text(refText, 18, headerY + 40);
       pdf.text(`DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - 50, headerY + 40);
       // Circular title
       pdf.setFontSize(14);
@@ -195,11 +299,13 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       let minExamDate: Date | null = null;
       scheduledExams
         .filter((exam) => {
-          const matchesYear = String(exam.year) === selectedYear;
+          const examYear = Number(exam.year ?? exam.subject_detail?.year);
+          const matchesYear = String(examYear) === selectedYear;
           const type = exam.examType || exam.exam_type;
-          const matchesType = type ? type === selectedExam : true;
+          const matchesType = type === selectedExam; // require exact match
           const hasDate = Boolean(exam.scheduledDate || exam.examDate);
-          return matchesYear && matchesType && hasDate;
+          const matchesSem = selectedSemester ? String(exam.semester ?? exam.sem ?? "") === selectedSemester : true;
+          return matchesYear && matchesSem && matchesType && hasDate;
         })
         .forEach((exam) => {
           const raw = (exam.scheduledDate || exam.examDate) as string;
@@ -213,10 +319,14 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       let startDateStr =
         minExamDate && !isNaN((minExamDate as Date).getTime())
           ? (minExamDate as Date).toLocaleDateString("en-GB")
-          : "____";
+          : dynamicStartDate || "____";
       // Use selectedExam and selectedYear for circular text, match preview page wording
-      const examName = selectedExam === "IA1" ? "Internal Assessment-I" : selectedExam === "IA2" ? "Internal Assessment-II" : selectedExam === "IA3" ? "Internal Assessment-III" : selectedExam;
-      const yearText = selectedYear === "2" ? "II" : selectedYear === "3" ? "III" : selectedYear;
+      const alertExamType = (matchedAlert?.examType || (matchedAlert as any)?.exam_type) as string | undefined;
+      const alertYear = matchedAlert?.year as number | string | undefined;
+      const effectiveExamType = alertExamType || selectedExam;
+      const effectiveYearStr = String(alertYear ?? selectedYear);
+      const examName = effectiveExamType === "IA1" ? "Internal Assessment-I" : effectiveExamType === "IA2" ? "Internal Assessment-II" : effectiveExamType === "IA3" ? "Internal Assessment-III" : effectiveExamType;
+      const yearText = effectiveYearStr === "1" ? "I" : effectiveYearStr === "2" ? "II" : effectiveYearStr === "3" ? "III" : effectiveYearStr === "4" ? "IV" : effectiveYearStr;
       const circularText = `The ${examName} Exam for ${yearText} year students starts from ${startDateStr} onwards. All the students are hereby informed to take the exams seriously. The marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
       const lines = pdf.splitTextToSize(circularText, pageWidth - 40);
       pdf.text(lines, 12, y + 8);
@@ -256,12 +366,16 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Build schedule data: group by date, then by department (filtered by year and semester)
       const scheduleMap = new Map();
       scheduledExams.forEach((exam) => {
-        if (!exam.scheduledDate || !exam.department) return;
+        const dateRaw = (exam.scheduledDate || exam.examDate) as string | undefined;
+        if (!dateRaw || !exam.department) return;
         // Filter by selected year
-        if (String(exam.year) !== selectedYear) return;
-        // Filter by selected semester if one is selected
+        const examYear = Number(exam.year ?? exam.subject_detail?.year);
+        if (String(examYear) !== selectedYear) return;
         if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
-        const date = new Date(exam.scheduledDate).toLocaleDateString("en-GB");
+        // Filter by selected exam type if provided
+        const type = exam.examType || exam.exam_type;
+        if (type !== selectedExam) return; // require exact match
+        const date = new Date(dateRaw).toLocaleDateString("en-GB");
         if (!scheduleMap.has(date)) scheduleMap.set(date, {});
         scheduleMap.get(date)[exam.department] = exam;
       });
@@ -403,8 +517,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                     onChange={(e) => setSelectedYear(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
+                    <option value="1">I Year</option>
                     <option value="2">II Year</option>
                     <option value="3">III Year</option>
+                    <option value="4">IV Year</option>
                   </select>
                 </div>
 
@@ -418,6 +534,12 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">All Semesters</option>
+                    {selectedYear === "1" && (
+                      <>
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                      </>
+                    )}
                     {selectedYear === "2" && (
                       <>
                         <option value="3">Semester 3</option>
@@ -428,6 +550,12 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                       <>
                         <option value="5">Semester 5</option>
                         <option value="6">Semester 6</option>
+                      </>
+                    )}
+                    {selectedYear === "4" && (
+                      <>
+                        <option value="7">Semester 7</option>
+                        <option value="8">Semester 8</option>
                       </>
                     )}
                   </select>
@@ -442,28 +570,9 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                     onChange={(e) => setSelectedExam(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    {selectedYear === "2" && (
-                      <>
-                        <option value="IA1">IA1 - Internal Assessment I</option>
-                        <option value="IA2">
-                          IA2 - Internal Assessment II
-                        </option>
-                        <option value="IA3">
-                          IA3 - Internal Assessment III
-                        </option>
-                      </>
-                    )}
-                    {selectedYear === "3" && (
-                      <>
-                        <option value="IA1">IA1 - Internal Assessment I</option>
-                        <option value="IA2">
-                          IA2 - Internal Assessment II
-                        </option>
-                        <option value="IA3">
-                          IA3 - Internal Assessment III
-                        </option>
-                      </>
-                    )}
+                    <option value="IA1">IA1 - Internal Assessment I</option>
+                    <option value="IA2">IA2 - Internal Assessment II</option>
+                    <option value="IA3">IA3 - Internal Assessment III</option>
                   </select>
                 </div>
               </div>
@@ -479,11 +588,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                       </h3>
                     </div>
                     <div className="text-sm text-gray-500">
-                      {new Date().toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      })}
+                      {previewSortedDates[0] || dynamicStartDate || ""}
                     </div>
                   </div>
                 </div>
@@ -496,7 +601,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                           DATE
                         </th>
                         {departments.map((dept) => (
-                          <th key={dept.code} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                          <th
+                            key={dept.code}
+                            className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border"
+                          >
                             {dept.code}
                           </th>
                         ))}

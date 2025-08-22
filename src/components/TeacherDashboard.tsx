@@ -9,7 +9,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Home,
-  Building,
   User,
   LogOut,
   FileText,
@@ -689,50 +688,7 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Content Sections */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Recent Activity */}
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <FileText className="h-5 w-5 text-gray-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Recent Activity
-                        </h3>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Latest examination alerts and schedules
-                      </p>
-                      <div className="text-center py-8">
-                        <p className="text-gray-500">No recent activity</p>
-                      </div>
-                    </div>
-
-                    {/* My Department */}
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <Building className="h-5 w-5 text-gray-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          My Department
-                        </h3>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Your department status
-                      </p>
-                      <div className="bg-blue-50 rounded-lg p-4">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-blue-900">
-                            {user?.department || "Department"}
-                          </p>
-                          <p className="text-sm text-blue-700">
-                            Your Department
-                          </p>
-                          <p className="text-sm text-green-600 font-medium">
-                            ✓ Active
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Content sections removed per requirements (Recent Activity and My Department) */}
                 </div>
               )}
 

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Mail, Phone, Loader2 } from 'lucide-react';
+import { Trash2, Mail, Loader2 } from 'lucide-react';
 import { staffService, StaffMember } from '../services/staffService';
 
 export const StaffManagement: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +27,8 @@ export const StaffManagement: React.FC = () => {
     loadData();
   }, []);
 
-  // Filter staff based on search term
-  const filteredStaff = staffMembers.filter(staff =>
-    staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.subjects?.some(subject =>
-      subject.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      subject.subject_code.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Use full staff list (search removed per request)
+  const filteredStaff = staffMembers;
 
   const getRoleColor = (role: string) => {
     return role === 'Administrator'
@@ -76,19 +67,7 @@ export const StaffManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
-        </div>
-        <input
-          type="text"
-          placeholder="Search staff by name, email, department, or subject..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
+      {/* Search Bar removed per request */}
 
       {/* Staff Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -125,9 +104,7 @@ export const StaffManagement: React.FC = () => {
                 {filteredStaff.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      {searchTerm
-                        ? 'No staff members found matching your search.'
-                        : 'No staff members found.'}
+                      {'No staff members found.'}
                     </td>
                   </tr>
                 ) : (
@@ -154,10 +131,6 @@ export const StaffManagement: React.FC = () => {
                           <div className="flex items-center space-x-2">
                             <Mail className="h-4 w-4 text-gray-400" />
                             <span className="text-sm text-gray-900">{staff.email}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">{staff.phone}</span>
                           </div>
                         </div>
                       </td>

@@ -32,12 +32,19 @@ export const SubjectManagement: React.FC = () => {
   const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
 
   // Get unique years and semesters from subjects
-  const uniqueYears = [...new Set(subjects.map((s) => s.year))].sort();
   const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))].sort();
 
   // Allowed semesters depend on selected year
   const allowedSemesters: number[] =
-    selectedYear === 2 ? [3, 4] : selectedYear === 3 ? [5, 6] : uniqueSemesters;
+    selectedYear === 1
+      ? [1, 2]
+      : selectedYear === 2
+      ? [3, 4]
+      : selectedYear === 3
+      ? [5, 6]
+      : selectedYear === 4
+      ? [7, 8]
+      : uniqueSemesters;
 
   useEffect(() => {
     loadSubjects();
@@ -126,10 +133,14 @@ export const SubjectManagement: React.FC = () => {
     const matchesYear = selectedYear === "all" || subject.year === selectedYear;
     const matchesSemester =
       selectedSemester === "all"
-        ? selectedYear === 2
+        ? selectedYear === 1
+          ? [1, 2].includes(subject.semester)
+          : selectedYear === 2
           ? [3, 4].includes(subject.semester)
           : selectedYear === 3
           ? [5, 6].includes(subject.semester)
+          : selectedYear === 4
+          ? [7, 8].includes(subject.semester)
           : true
         : subject.semester === selectedSemester;
 
@@ -150,13 +161,6 @@ export const SubjectManagement: React.FC = () => {
 
     return matchesSearch && matchesFilter && matchesYear && matchesSemester;
   });
-
-  const getStatusIcon = (isScheduled: boolean) => {
-    if (isScheduled) {
-      return <CheckCircle className="h-5 w-5 text-green-600" />;
-    }
-    return <XCircle className="h-5 w-5 text-red-600" />;
-  };
 
   const getStatusBadge = (isScheduled: boolean) => {
     if (isScheduled) {
@@ -191,15 +195,8 @@ export const SubjectManagement: React.FC = () => {
 
   // Add subject functionality removed per requirements
 
-  const refreshData = async () => {
-    await loadSubjects();
-  };
 
-  const stats = {
-    total: subjects.length,
-    scheduled: subjects.filter((s) => s.isScheduled).length,
-    pending: subjects.filter((s) => !s.isScheduled).length,
-  };
+  // Removed unused aggregate stats (using filtered stats instead)
 
   // Update stats based on current filters (excluding text search)
   const getFilteredStats = () => {
@@ -208,8 +205,10 @@ export const SubjectManagement: React.FC = () => {
     );
     const semesterFiltered = yearFiltered.filter((s) => {
       if (selectedSemester === "all") {
+        if (selectedYear === 1) return [1, 2].includes(s.semester);
         if (selectedYear === 2) return [3, 4].includes(s.semester);
         if (selectedYear === 3) return [5, 6].includes(s.semester);
+        if (selectedYear === 4) return [7, 8].includes(s.semester);
         return true;
       }
       return s.semester === selectedSemester;
@@ -378,7 +377,7 @@ export const SubjectManagement: React.FC = () => {
                 >
                   All Years
                 </button>
-                {uniqueYears.map((year) => (
+                {[1, 2, 3, 4].map((year) => (
                   <button
                     key={year}
                     onClick={() => {
