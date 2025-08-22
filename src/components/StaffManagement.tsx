@@ -74,7 +74,11 @@ export const StaffManagement: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
           <p className="text-sm text-gray-600">Manage staff members and their roles</p>
         </div>
+<<<<<<< HEAD
         {/* Removed refresh button */}
+=======
+        
+>>>>>>> 4c0e4803e56f29204c2f23926f86db30ffb3bf5c
       </div>
 
       {/* Error Message */}
@@ -85,6 +89,7 @@ export const StaffManagement: React.FC = () => {
       )}
 
       {/* Search Bar */}
+<<<<<<< HEAD
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-gray-400" />
@@ -97,6 +102,8 @@ export const StaffManagement: React.FC = () => {
           className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
+=======
+>>>>>>> 4c0e4803e56f29204c2f23926f86db30ffb3bf5c
 
       {/* Staff Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -157,6 +164,7 @@ export const StaffManagement: React.FC = () => {
                           {staff.role}
                         </span>
                       </td>
+<<<<<<< HEAD
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
@@ -170,6 +178,18 @@ export const StaffManagement: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+=======
+                                             <td className="px-6 py-4 whitespace-nowrap">
+                         <div className="space-y-1">
+                           <div className="flex items-center space-x-2">
+                             <Mail className="h-4 w-4 text-gray-400" />
+                             <span className="text-sm text-gray-900">{staff.email}</span>
+                           </div>
+                           
+                         </div>
+                       </td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+>>>>>>> 4c0e4803e56f29204c2f23926f86db30ffb3bf5c
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleDelete(staff.id)}

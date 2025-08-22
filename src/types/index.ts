@@ -31,8 +31,16 @@ export interface ExamAlert {
   title: string;
   startDate: string;
   endDate: string;
+<<<<<<< HEAD
   year: 1 | 2 | 3 | 4;
+=======
+  year: number;
+>>>>>>> 4c0e4803e56f29204c2f23926f86db30ffb3bf5c
   semester: number;
+  refId?: string;
+  examType?: string;
+  alertDate?: string;
+  deadline?: string;
   departments: string[];
   createdAt: string;
   status: 'active' | 'closed';
