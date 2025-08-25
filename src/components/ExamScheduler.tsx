@@ -17,9 +17,46 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
   const [selectedDate, setSelectedDate] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { exams, scheduleExam } = useExams();
+  const { exams, scheduleExam, alerts } = useExams();
   const { user } = useAuth();
   const [staffId, setStaffId] = useState<string | null>(null);
+  
+  // Check if scheduling is allowed for this year
+  const hasValidAlert = useMemo(() => {
+    console.log('Checking exam scheduling availability...');
+    console.log('All alerts:', JSON.stringify(alerts, null, 2));
+    console.log('Current exam:', JSON.stringify(exam, null, 2));
+
+    // Convert exam year to number and validate
+    const examYear = Number(exam.year);
+    if (isNaN(examYear)) {
+      console.error('Invalid exam year:', exam.year);
+      return false;
+    }
+    
+    // Find alerts that match the exam's year
+    const validAlerts = alerts.filter(alert => {
+      console.log('Checking alert:', JSON.stringify(alert, null, 2));
+      const alertYear = Number(alert.year);
+      
+      if (isNaN(alertYear)) {
+        console.warn('Invalid alert year:', alert.year);
+        return false;
+      }
+      
+      console.log(`Comparing alert year (${alertYear}) with exam year (${examYear})`);
+      
+      // Check if alert is active and year matches
+      const isValid = alert.status === 'active' && alertYear === examYear;
+      if (isValid) {
+        console.log('Found valid alert:', JSON.stringify(alert, null, 2));
+      }
+      return isValid;
+    });
+
+    console.log('Valid alerts found:', validAlerts.length, validAlerts);
+    return validAlerts.length > 0;
+  }, [alerts, exam.year]);
   const scheduledDates = useMemo(() => new Set(
     exams
       .filter(e => e.status === 'scheduled' && e.department === exam.department && e.year === exam.year)
@@ -178,53 +215,66 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
             </div>
           </div>
 
-          {/* Date Selection */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="inline h-4 w-4 mr-1" />
-                Select Exam Date
-              </label>
-              {(() => {
-                const minParsed = parseYMD((exam as any).startDate);
-                const maxParsed = parseYMD((exam as any).endDate);
-                const minDate = minParsed;
-                const maxDate = maxParsed && minParsed && maxParsed >= minParsed ? maxParsed : (minParsed ? null : maxParsed);
-                const selected = selectedDate ? parseYMD(selectedDate) : null;
-                const isDisabled = (d: Date) => {
-                  const ds = format(d, 'yyyy-MM-dd');
-                  return d.getDay() === 0 || scheduledDates.has(ds);
-                };
-                // Choose an initial visible month within the valid range
-                const today = new Date();
-                let openTo = selected ?? (minDate ?? maxDate ?? today);
-                // Clamp openTo into [minDate, maxDate] if both exist
-                if (minDate && openTo < minDate) openTo = minDate;
-                if (maxDate && openTo > maxDate) openTo = maxDate;
-                return (
-                  <DatePicker
-                    selected={selected}
-                    onChange={(d: Date | null) => {
-                      const value = d ? format(d, 'yyyy-MM-dd') : '';
-                      handleDateChange(value);
-                    }}
-                    minDate={minDate ?? undefined}
-                    maxDate={maxDate ?? undefined}
-                    filterDate={(d: Date) => !isDisabled(d)}
-                    placeholderText="Select a date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    dateFormat="yyyy-MM-dd"
-                    inline={false}
-                    openToDate={openTo}
-                  />
-                );
-              })()}
-              <p className="text-xs text-gray-500 mt-1">
-                {((exam as any).startDate && (exam as any).endDate)
-                  ? `Must be between ${(exam as any).startDate} and ${(exam as any).endDate}. Sundays and already scheduled dates are disabled.`
-                  : `Sundays and already scheduled dates are disabled.`}
-              </p>
-            </div>
+            {/* Date Selection */}
+            {!hasValidAlert ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-yellow-800">Scheduling Not Available</h4>
+                    <p className="text-sm mt-1 text-yellow-700">
+                      Exam dates have not been set for Year {exam.year} {exam.department} department yet. 
+                      Please contact the admin to set up exam dates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="inline h-4 w-4 mr-1" />
+                  Select Exam Date
+                </label>
+                {(() => {
+                  const minParsed = parseYMD(exam.startDate);
+                  const maxParsed = parseYMD(exam.endDate);
+                  const minDate = minParsed;
+                  const maxDate = maxParsed;
+                  const selected = selectedDate ? parseYMD(selectedDate) : null;
+                  const isDisabled = (d: Date) => {
+                    const ds = format(d, 'yyyy-MM-dd');
+                    return d.getDay() === 0 || scheduledDates.has(ds) || 
+                           (minDate && d < minDate) || (maxDate && d > maxDate);
+                  };
+                  let openTo = selected ?? (minDate ?? maxDate ?? new Date());
+                  if (minDate && openTo < minDate) openTo = minDate;
+                  if (maxDate && openTo > maxDate) openTo = maxDate;
+                  return (
+                    <DatePicker
+                      selected={selected}
+                      onChange={(d: Date | null) => {
+                        const value = d ? format(d, 'yyyy-MM-dd') : '';
+                        handleDateChange(value);
+                      }}
+                      minDate={minDate ?? undefined}
+                      maxDate={maxDate ?? undefined}
+                      filterDate={(d: Date) => !isDisabled(d)}
+                      placeholderText="Select a date"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      dateFormat="yyyy-MM-dd"
+                      inline={false}
+                      openToDate={openTo}
+                    />
+                  );
+                })()}
+                <p className="text-xs text-gray-500 mt-1">
+                  {exam.startDate && exam.endDate
+                    ? `Must be between ${exam.startDate} and ${exam.endDate}. Sundays and already scheduled dates are disabled.`
+                    : `Sundays and already scheduled dates are disabled.`}
+                </p>
+              </div>
+            )}
 
             {/* Conflict Notice */}
             {conflict && (
@@ -256,8 +306,6 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
               </div>
             )}
 
-
-
             {/* Exam Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start">
@@ -282,7 +330,7 @@ export const ExamScheduler: React.FC<ExamSchedulerProps> = ({ exam, onClose, onS
               </button>
               <button
                 type="submit"
-                disabled={!selectedDate || conflict?.includes('Conflict:') || conflict?.includes('Error:') || loading}
+                disabled={!hasValidAlert || !selectedDate || conflict?.includes('Conflict:') || conflict?.includes('Error:') || loading}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Scheduling...' : 'Schedule Exam'}

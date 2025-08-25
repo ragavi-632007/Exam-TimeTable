@@ -54,14 +54,19 @@ export const TeacherDashboard: React.FC = () => {
     { value: "IA3", label: "Internal Assessment 3" },
   ];
 
-  // Use alerts from context; exam_settings is global (no per-dept/year), so just expose dates
+  // Update exam dates based on selected year and alerts from context
   useEffect(() => {
     setAlerts(ctxAlerts || []);
-    if (ctxAlerts && ctxAlerts.length > 0) {
-      setExamStartDate(ctxAlerts[0].startDate || "");
-      setExamEndDate(ctxAlerts[0].endDate || "");
+    const yearAlerts = ctxAlerts?.filter(
+      alert => alert.year === selectedYear && 
+      alert.departments?.map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+    ) || [];
+    
+    if (yearAlerts.length > 0) {
+      setExamStartDate(yearAlerts[0].startDate || "");
+      setExamEndDate(yearAlerts[0].endDate || "");
     }
-  }, [ctxAlerts]);
+  }, [ctxAlerts, selectedYear, user?.department]);
 
   // Ensure semester options follow the selected year
   useEffect(() => {

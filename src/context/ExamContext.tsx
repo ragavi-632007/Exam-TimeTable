@@ -46,8 +46,22 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshAlerts = async () => {
     try {
+      console.log('Fetching exam alerts...');
       const alertData = await examService.getExamAlerts();
-      setAlerts(alertData);
+      console.log('Raw alert data:', JSON.stringify(alertData, null, 2));
+      
+      // Filter out any alerts with invalid years
+      const validAlerts = alertData.filter(alert => {
+        const year = Number(alert.year);
+        if (isNaN(year) || year < 1 || year > 4) {
+          console.warn('Filtering out alert with invalid year:', alert);
+          return false;
+        }
+        return true;
+      });
+      
+      console.log('Setting alerts state with:', JSON.stringify(validAlerts, null, 2));
+      setAlerts(validAlerts);
     } catch (error) {
       console.error('Error fetching alerts:', error);
     }

@@ -75,15 +75,22 @@ export const examService = {
       throw new Error(error.message);
     }
 
-    // Fetch exam period from exam_settings
+    // Fetch all exam periods from exam_settings
     const { data: examSettings } = await supabase
       .from("exam_settings")
-      .select("exam_start_date, exam_end_date")
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .select("exam_start_date, exam_end_date, year")
+      .order("created_at", { ascending: false });
 
-    const startDate = examSettings?.[0]?.exam_start_date || "";
-    const endDate = examSettings?.[0]?.exam_end_date || "";
+    // Create a map of year to exam dates
+    const examDatesByYear = (examSettings || []).reduce((map, setting) => {
+      if (setting.year && setting.exam_start_date && setting.exam_end_date) {
+        map[setting.year] = {
+          startDate: setting.exam_start_date,
+          endDate: setting.exam_end_date
+        };
+      }
+      return map;
+    }, {} as Record<number, { startDate: string, endDate: string }>);
 
     return data.map((subject) => ({
       id: subject.id,
@@ -97,8 +104,8 @@ export const examService = {
       teacherId: "", // Will be set from exam_schedules
       teacherName: "", // Will be set from exam_schedules
       scheduledDate: subject.exam_schedules?.[0]?.exam_date || null,
-      startDate,
-      endDate,
+      startDate: examDatesByYear[subject.year]?.startDate || "",
+      endDate: examDatesByYear[subject.year]?.endDate || "",
       status: subject.exam_schedules?.[0]?.exam_date ? "scheduled" : "pending",
     }));
   },
@@ -154,6 +161,60 @@ export const examService = {
     assignedBy: string,
     selectedExamType: "IA1" | "IA2" | "IA3"
   ): Promise<void> {
+    // First, get the subject details to know which year it belongs to
+    let subjectYear: number;
+    if (subjectId.startsWith("staff-subject-")) {
+      const staffId = subjectId.replace("staff-subject-", "");
+      const { data: staffData } = await supabase
+        .from("staff_details")
+        .select("subject_code")
+        .eq("id", staffId)
+        .single();
+
+      const { data: subjectYearData } = await supabase
+        .from("subject_detail")
+        .select("year")
+        .eq("subcode", staffData?.subject_code)
+        .single();
+
+      subjectYear = subjectYearData?.year;
+    } else {
+      const { data: subjectData } = await supabase
+        .from("subject_detail")
+        .select("year")
+        .eq("id", subjectId)
+        .single();
+
+      subjectYear = subjectData?.year;
+    }
+
+    // Get exam settings for this specific year
+    const { data: examSettings, error: settingsError } = await supabase
+      .from("exam_settings")
+      .select("*")
+      .eq("year", subjectYear)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (settingsError) {
+      throw new Error(`Failed to fetch exam settings: ${settingsError.message}`);
+    }
+
+    if (!examSettings || examSettings.length === 0) {
+      throw new Error(`No exam settings found for year ${subjectYear}`);
+    }
+
+    // Check if the selected date falls within the year-specific exam period
+    const examPeriod = examSettings[0];
+    const selectedDate = new Date(examDate);
+    const periodStart = new Date(examPeriod.exam_start_date);
+    const periodEnd = new Date(examPeriod.exam_end_date);
+
+    if (selectedDate < periodStart || selectedDate > periodEnd) {
+      throw new Error(
+        `Selected date must be between ${examPeriod.exam_start_date} and ${examPeriod.exam_end_date} for Year ${subjectYear}`
+      );
+    }
     // Get the current department's ID based on the staff member or subject
     let currentDepartmentId: string;
     // Removed unused subjectName variable
@@ -917,27 +978,48 @@ export const examService = {
 
   // Get exam settings (mapped to ExamAlert interface)
   async getExamAlerts(): Promise<ExamAlert[]> {
-    const { data, error } = await supabase
+    console.log('Fetching exam alerts...');
+    const { data: settings, error: settingsError } = await supabase
       .from("exam_settings")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      throw new Error(error.message);
+    if (settingsError) {
+      console.error('Error fetching exam settings:', settingsError);
+      throw new Error(settingsError.message);
     }
 
-    return data.map((setting) => ({
-      id: setting.id,
-      title: `Exam Settings - ${setting.exam_start_date} to ${setting.exam_end_date}`,
-      startDate: setting.exam_start_date,
-      endDate: setting.exam_end_date,
-      year: setting.year,
-      semester: setting.semester,
-      refId: setting.refid,
-      departments: [], // Will need to be derived from other data
-      status: "active",
-      createdAt: setting.created_at,
-    }));
+    console.log('Raw exam settings data:', settings);
+
+    // Get all departments (for mapping to alerts)
+    const { data: departments, error: deptError } = await supabase
+      .from("departments")
+      .select("*");
+
+    if (deptError) {
+      console.error('Error fetching departments:', deptError);
+      throw new Error(deptError.message);
+    }
+
+    const alerts = settings
+      .filter(setting => setting?.year && setting.exam_start_date && setting.exam_end_date)
+      .map((setting): ExamAlert => ({
+        id: setting.id,
+        title: `Exam Settings - ${setting.exam_start_date} to ${setting.exam_end_date}`,
+        startDate: setting.exam_start_date,
+        endDate: setting.exam_end_date,
+        year: Number(setting.year),
+        semester: setting.semester || 0,
+        refId: setting.refid || undefined,
+        departments: departments.map(d => d.name),
+        status: "active",
+        createdAt: setting.created_at,
+        examType: setting.exam_type,
+        alertDate: setting.alert_date
+      }));
+
+    console.log('Processed exam alerts:', alerts);
+    return alerts;
   },
 
   // Update exam setting
