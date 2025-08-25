@@ -247,7 +247,10 @@ export const TeacherDashboard: React.FC = () => {
             </li>
             <li>
               <button
-                onClick={() => setActiveTab("subjects")}
+                onClick={() => {
+                  setActiveTab("subjects");
+                  refreshExams(); // Refresh exams when switching to subjects tab
+                }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
                   activeTab === "subjects"
                     ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"

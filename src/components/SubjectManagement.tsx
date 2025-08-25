@@ -8,8 +8,8 @@ import {
   XCircle,
   ChevronDown,
 } from "lucide-react";
-import { subjectService, Subject } from "../services/subjectService";
-import { examService } from "../services/examService";
+import {subjectService, Subject} from "../services/subjectService";
+import {examService} from "../services/examService";
 
 interface SubjectWithSchedule extends Subject {
   isScheduled: boolean;
@@ -25,11 +25,17 @@ export const SubjectManagement: React.FC = () => {
     "all" | "scheduled" | "pending"
   >("all");
   const [selectedYear, setSelectedYear] = useState<number | "all">("all");
-  const [selectedSemester, setSelectedSemester] = useState<number | "all">(
-    "all"
-  );
+  const [selectedSemester, setSelectedSemester] = useState<number | "all">("all");
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSubject, setNewSubject] = useState({
+    subcode: "",
+    name: "",
+    year: 1,
+    semester: 1,
+    department: ""
+  });
 
   // Get unique years and semesters from subjects
   const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))].sort();
@@ -237,6 +243,25 @@ export const SubjectManagement: React.FC = () => {
     );
   }
 
+  const handleAddSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await subjectService.createSubject(newSubject);
+      setShowAddForm(false);
+      setNewSubject({
+        subcode: "",
+        name: "",
+        year: 1,
+        semester: 1,
+        department: ""
+      });
+      await loadSubjects(); // Refresh the list
+    } catch (error) {
+      console.error("Error adding subject:", error);
+      alert("Failed to add subject. Please try again.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -249,7 +274,95 @@ export const SubjectManagement: React.FC = () => {
             Manage subjects and view their scheduling status
           </p>
         </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Add Subject
+        </button>
       </div>
+
+      {/* Add Subject Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Subject</h3>
+            <form onSubmit={handleAddSubject} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Subject Code</label>
+                <input
+                  type="text"
+                  required
+                  value={newSubject.subcode}
+                  onChange={(e) => setNewSubject({ ...newSubject, subcode: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Subject Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newSubject.name}
+                  onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Year</label>
+                <select
+                  required
+                  value={newSubject.year}
+                  onChange={(e) => setNewSubject({ ...newSubject, year: parseInt(e.target.value) })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  {[1, 2, 3, 4].map((year) => (
+                    <option key={year} value={year}>Year {year}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Semester</label>
+                <select
+                  required
+                  value={newSubject.semester}
+                  onChange={(e) => setNewSubject({ ...newSubject, semester: parseInt(e.target.value) })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                    <option key={sem} value={sem}>Semester {sem}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Department</label>
+                <input
+                  type="text"
+                  required
+                  value={newSubject.department}
+                  onChange={(e) => setNewSubject({ ...newSubject, department: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Add Subject
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
