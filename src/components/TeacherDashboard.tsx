@@ -29,7 +29,7 @@ export const TeacherDashboard: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<1 | 2 | 3 | 4>(1);
   const [selectedSemester, setSelectedSemester] = useState<number>(3);
   const [selectedExamType, setSelectedExamType] = useState<
-    "IA1" | "IA2" | "IA3"
+    "IA1" | "IA2" | "MODEL"
   >("IA1");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export const TeacherDashboard: React.FC = () => {
   const examTypes = [
     { value: "IA1", label: "Internal Assessment 1" },
     { value: "IA2", label: "Internal Assessment 2" },
-    { value: "IA3", label: "Internal Assessment 3" },
+    { value: "MODEL", label: "Model Examination" },
   ];
 
   // Update exam dates based on selected year and alerts from context

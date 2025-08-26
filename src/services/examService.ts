@@ -159,7 +159,7 @@ export const examService = {
     subjectId: string,
     examDate: string,
     assignedBy: string,
-    selectedExamType: "IA1" | "IA2" | "IA3"
+    selectedExamType: "IA1" | "IA2" | "MODEL"
   ): Promise<void> {
     // First, get the subject details to know which year it belongs to
     let subjectYear: number;
@@ -789,7 +789,7 @@ export const examService = {
       department: schedule.departments?.name || "Unknown",
       scheduledDate: schedule.exam_date,
       examDate: schedule.exam_date,
-      examType: schedule.exam_type,
+      examType: schedule.exam_type || 'IA1', // Default to IA1 if not set
       status: "scheduled",
       year: schedule.subject_detail?.year || 2,
       // Prefer 'sem' if present, else 'semester' field, else undefined

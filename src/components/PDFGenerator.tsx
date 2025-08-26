@@ -40,7 +40,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const [generating, setGenerating] = useState(false);
   const [selectedYear, setSelectedYear] = useState("2");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
-  const [selectedExam, setSelectedExam] = useState("IA2");
+  const [selectedExam, setSelectedExam] = useState("IA1");
+  const [refId1, setRefId1] = useState("");
+  const [refId2, setRefId2] = useState("");
+  const [refId3, setRefId3] = useState("");
   const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   const [departments, setDepartments] = useState(defaultDepartments);
   const [loading, setLoading] = useState(true);
@@ -154,9 +157,6 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       const examYear = Number(exam.year ?? exam.subject_detail?.year);
       if (String(examYear) !== selectedYear) return;
       if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
-      // Match selected exam type if available
-      const type = exam.examType || exam.exam_type;
-      if (type !== selectedExam) return; // require exact match
       const date = new Date(dateRaw).toLocaleDateString("en-GB");
       if (!map.has(date)) map.set(date, {});
       map.get(date)[exam.department] = exam;
@@ -283,7 +283,8 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       pdf.text("OFFICE OF THE CONTROLLER OF EXAMINATIONS", pageWidth / 2, headerY + 30, { align: "center" });
       // Reference and Date
       pdf.setFontSize(10);
-      const refText = dynamicRefId ? `REF: ${dynamicRefId}` : `REF: CIT/COE /____/____/____`;
+      const customRefId = `CIT/COE/${refId1 || '____'}/${refId2 || '____'}/${refId3 || '____'}`;
+      const refText = `REF: ${customRefId}`;
       pdf.text(refText, 18, headerY + 40);
       pdf.text(`DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - 50, headerY + 40);
       // Circular title
@@ -301,11 +302,9 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         .filter((exam) => {
           const examYear = Number(exam.year ?? exam.subject_detail?.year);
           const matchesYear = String(examYear) === selectedYear;
-          const type = exam.examType || exam.exam_type;
-          const matchesType = type === selectedExam; // require exact match
           const hasDate = Boolean(exam.scheduledDate || exam.examDate);
           const matchesSem = selectedSemester ? String(exam.semester ?? exam.sem ?? "") === selectedSemester : true;
-          return matchesYear && matchesSem && matchesType && hasDate;
+          return matchesYear && matchesSem && hasDate;
         })
         .forEach((exam) => {
           const raw = (exam.scheduledDate || exam.examDate) as string;
@@ -325,7 +324,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       const alertYear = matchedAlert?.year as number | string | undefined;
       const effectiveExamType = alertExamType || selectedExam;
       const effectiveYearStr = String(alertYear ?? selectedYear);
-      const examName = effectiveExamType === "IA1" ? "Internal Assessment-I" : effectiveExamType === "IA2" ? "Internal Assessment-II" : effectiveExamType === "IA3" ? "Internal Assessment-III" : effectiveExamType;
+      const examName = effectiveExamType === "IA1" ? "Internal Assessment-I" 
+        : effectiveExamType === "IA2" ? "Internal Assessment-II" 
+        : effectiveExamType === "MODEL" ? "Model Examination"
+        : effectiveExamType;
       const yearText = effectiveYearStr === "1" ? "I" : effectiveYearStr === "2" ? "II" : effectiveYearStr === "3" ? "III" : effectiveYearStr === "4" ? "IV" : effectiveYearStr;
       const circularText = `The ${examName} Exam for ${yearText} year students starts from ${startDateStr} onwards. All the students are hereby informed to take the exams seriously. The marks secured in these tests will be considered for awarding the internal marks. The schedule for the exams is as follows.`;
       const lines = pdf.splitTextToSize(circularText, pageWidth - 40);
@@ -372,9 +374,6 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         const examYear = Number(exam.year ?? exam.subject_detail?.year);
         if (String(examYear) !== selectedYear) return;
         if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
-        // Filter by selected exam type if provided
-        const type = exam.examType || exam.exam_type;
-        if (type !== selectedExam) return; // require exact match
         const date = new Date(dateRaw).toLocaleDateString("en-GB");
         if (!scheduleMap.has(date)) scheduleMap.set(date, {});
         scheduleMap.get(date)[exam.department] = exam;
@@ -572,8 +571,43 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                   >
                     <option value="IA1">IA1 - Internal Assessment I</option>
                     <option value="IA2">IA2 - Internal Assessment II</option>
-                    <option value="IA3">IA3 - Internal Assessment III</option>
+                    <option value="MODEL">MODEL - Model Examination</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reference ID
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-600">CIT/COE/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId1}
+                      onChange={(e) => setRefId1(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                    <span className="text-gray-600">/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId2}
+                      onChange={(e) => setRefId2(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                    <span className="text-gray-600">/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId3}
+                      onChange={(e) => setRefId3(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                  </div>
                 </div>
               </div>
 

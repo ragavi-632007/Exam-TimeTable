@@ -17,7 +17,7 @@ export interface Exam {
     year: 1 | 2 | 3 | 4;
   };
   semester: number;
-  examType?: 'IA1' | 'IA2' | 'IA3';
+  examType: 'IA1' | 'IA2' | 'MODEL';
   teacherId: string;
   teacherName: string;
   scheduledDate?: string;

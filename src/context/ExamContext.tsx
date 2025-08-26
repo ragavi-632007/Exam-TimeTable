@@ -14,7 +14,7 @@ interface ExamContextType {
   updateExam: (examId: string, updates: Partial<Exam>) => Promise<void>;
   createExam: (examData: Omit<Exam, 'id'>) => Promise<void>;
   deleteExam: (examId: string) => Promise<void>;
-  scheduleExam: (subjectId: string, examDate: string, assignedBy: string) => Promise<void>;
+  scheduleExam: (subjectId: string, examDate: string, assignedBy: string, examType?: 'IA1' | 'IA2' | 'MODEL') => Promise<void>;
   createAlert: (alertData: Omit<ExamAlert, 'id' | 'createdAt'>) => Promise<void>;
   updateAlert: (alertId: string, updates: Partial<ExamAlert>) => Promise<void>;
 }
@@ -109,9 +109,9 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const scheduleExam = async (subjectId: string, examDate: string, assignedBy: string) => {
+  const scheduleExam = async (subjectId: string, examDate: string, assignedBy: string, examType: 'IA1' | 'IA2' | 'MODEL' = 'IA1') => {
     try {
-      await examService.scheduleExam(subjectId, examDate, assignedBy);
+      await examService.scheduleExam(subjectId, examDate, assignedBy, examType);
       
       // Refresh scheduled exams after scheduling
       await refreshScheduledExams();
