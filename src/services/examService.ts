@@ -1137,4 +1137,22 @@ export const examService = {
       throw new Error(error.message);
     }
   },
+
+  // Reset all exam schedules while keeping subjects intact
+  async resetAllExamSchedules(): Promise<void> {
+    try {
+      // Delete all records from exam_schedules table
+      const { error } = await supabase
+        .from("exam_schedules")
+        .delete()
+        .gte("id", "00000000-0000-0000-0000-000000000000"); // This will match all UUIDs
+      
+      if (error) {
+        throw new Error(`Failed to reset exam schedules: ${error.message}`);
+      }
+    } catch (error) {
+      console.error("Error resetting exam schedules:", error);
+      throw error;
+    }
+  },
 };
