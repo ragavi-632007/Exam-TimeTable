@@ -125,7 +125,9 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createAlert = async (alertData: Omit<ExamAlert, 'id' | 'createdAt'>) => {
     try {
-      const newAlert = await examService.createExamAlert(alertData);
+      // examService.createExamAlert expects a `createdBy` and explicit fields; supply a fallback createdBy ('')
+      // We cast to any to avoid a large mapping here; this is a small compatibility shim.
+      const newAlert = await examService.createExamAlert({ ...(alertData as any), createdBy: (alertData as any).createdBy || '' } as any);
       setAlerts(prevAlerts => [newAlert, ...prevAlerts]);
     } catch (error) {
       console.error('Error creating alert:', error);
@@ -161,6 +163,8 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadData();
   }, []);
+
+  // ...existing code...
 
   return (
     <ExamContext.Provider value={{

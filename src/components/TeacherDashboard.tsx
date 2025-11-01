@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useExams } from "../context/ExamContext";
-import { Exam, ExamAlert } from "../types";
+import { ExamAlert } from "../types";
 import {
   Calendar,
   Clock,
@@ -14,7 +14,8 @@ import {
   FileText,
   Edit,
 } from "lucide-react";
-import { ExamScheduler } from "./ExamScheduler";
+import DatePicker from 'react-datepicker';
+import { format } from 'date-fns';
 import { EditExamSchedule } from "./EditExamSchedule";
 import { ExamTimetablePreview } from "./ExamTimetablePreview";
 import { examService } from "../services/examService";
@@ -22,7 +23,7 @@ import { examService } from "../services/examService";
 export const TeacherDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { exams, scheduledExams, loading, refreshExams, refreshScheduledExams, alerts: ctxAlerts } = useExams();
-  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  // selectedExam/modal removed; scheduling is inline now
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "subjects" | "schedule" | "timetable"
   >("dashboard");
@@ -37,16 +38,17 @@ export const TeacherDashboard: React.FC = () => {
   const [examStartDate, setExamStartDate] = useState<string>("");
   const [examEndDate, setExamEndDate] = useState<string>("");
   const [alerts, setAlerts] = useState<ExamAlert[]>([]);
+  const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
+  const [schedulingLoading, setSchedulingLoading] = useState<Record<string, boolean>>({});
 
-  // Log when ExamScheduler modal is opened
-  useEffect(() => {
-    if (selectedExam) {
-      console.log("[TeacherDashboard] ExamScheduler modal opened", {
-        exam: selectedExam,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }, [selectedExam]);
+  // ...existing code...
+
+  const parseYMD = (dateStr?: string | null): Date | null => {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  };
 
   const examTypes = [
     { value: "IA1", label: "Internal Assessment 1" },
@@ -144,7 +146,7 @@ export const TeacherDashboard: React.FC = () => {
       await refreshScheduledExams();
       await refreshExams();
 
-      setSelectedExam(null);
+  // modal removed; nothing to close
 
       // Show success message
       setSuccess(`Exam scheduled successfully for ${date}!`);
@@ -177,36 +179,7 @@ export const TeacherDashboard: React.FC = () => {
       ? Math.round((teacherScheduledExams.length / departmentSubjects.length) * 100)
       : 0;
 
-  const stats = [
-    {
-      label: "Available Subjects",
-      value: departmentSubjects.length.toString(),
-      icon: BookOpen,
-      color: "text-blue-600 bg-blue-100",
-      progress: 0,
-    },
-    {
-      label: "Scheduled Exams",
-      value: teacherScheduledExams.length.toString(),
-      icon: Calendar,
-      color: "text-green-600 bg-green-100",
-      progress: 0,
-    },
-    {
-      label: "Pending Schedules",
-      value: pendingExams.length.toString(),
-      icon: Clock,
-      color: "text-orange-600 bg-orange-100",
-      progress: 0,
-    },
-    {
-      label: "Completion Rate",
-      value: `${completionRate}%`,
-      icon: FileText,
-      color: "text-purple-600 bg-purple-100",
-      progress: completionRate,
-    },
-  ];
+  // Stats cards are rendered inline per year sections; no shared `stats` array needed.
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -921,7 +894,7 @@ export const TeacherDashboard: React.FC = () => {
                             value={selectedExamType}
                             onChange={(e) =>
                               setSelectedExamType(
-                                e.target.value as "IA1" | "IA2" | "IA3"
+                                e.target.value as "IA1" | "IA2" | "MODEL"
                               )
                             }
                             className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
@@ -990,12 +963,58 @@ export const TeacherDashboard: React.FC = () => {
                                     {exam.endDate}
                                   </p>
                                 </div>
-                                <button
-                                  onClick={() => setSelectedExam(exam)}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                  Schedule Date
-                                </button>
+                                <div className="flex items-center space-x-2">
+                                  {(!examStartDate && !exam.startDate) ? (
+                                    <div className="text-sm text-yellow-700">Scheduling not available for this year</div>
+                                  ) : (
+                                    <>
+                                      <DatePicker
+                                        selected={selectedDates[exam.id] ? parseYMD(selectedDates[exam.id]) : null}
+                                        onChange={(d: Date | null) => {
+                                          const value = d ? format(d, 'yyyy-MM-dd') : '';
+                                          setSelectedDates(prev => ({ ...prev, [exam.id]: value }));
+                                        }}
+                                        minDate={parseYMD(exam.startDate || examStartDate) ?? undefined}
+                                        maxDate={parseYMD(exam.endDate || examEndDate) ?? undefined}
+                                        filterDate={(d: Date) => {
+                                          // Exclude Sundays
+                                          if (d.getDay() === 0) return false;
+                                          const ds = format(d, 'yyyy-MM-dd');
+                                          // Exclude already scheduled dates for same dept+year
+                                          const scheduledSet = new Set(scheduledExams
+                                            .filter(se => se.department === exam.department && se.year === exam.year)
+                                            .map(se => se.scheduledDate)
+                                            .filter(Boolean));
+                                          if (scheduledSet.has(ds)) return false;
+                                          return true;
+                                        }}
+                                        placeholderText="Select date"
+                                        dateFormat="yyyy-MM-dd"
+                                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                      />
+                                      <button
+                                        onClick={async () => {
+                                          const date = selectedDates[exam.id];
+                                          if (!date) {
+                                            setError('Please select a date first.');
+                                            return;
+                                          }
+                                          try {
+                                            setSchedulingLoading(prev => ({ ...prev, [exam.id]: true }));
+                                            await handleScheduleExam(exam.id, date);
+                                            setSelectedDates(prev => ({ ...prev, [exam.id]: '' }));
+                                          } finally {
+                                            setSchedulingLoading(prev => ({ ...prev, [exam.id]: false }));
+                                          }
+                                        }}
+                                        disabled={!selectedDates[exam.id] || !!schedulingLoading[exam.id]}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {schedulingLoading[exam.id] ? 'Scheduling...' : 'Schedule'}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1070,18 +1089,7 @@ export const TeacherDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Exam Scheduler Modal */}
-                  {selectedExam && (
-                    <ExamScheduler
-                      exam={{
-                        ...selectedExam,
-                        startDate: examStartDate || "",
-                        endDate: examEndDate || "",
-                      }}
-                      onClose={() => setSelectedExam(null)}
-                      onSchedule={handleScheduleExam}
-                    />
-                  )}
+                  {/* Exam Scheduler Modal removed - scheduling is inline for teachers */}
 
                   {/* Edit Exam Schedule Modal (admins only) */}
                   {user?.role === "admin" && editingSchedule && (
