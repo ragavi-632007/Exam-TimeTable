@@ -10,7 +10,6 @@ export interface Subject {
   created_at: string;
   updated_at: string;
   is_shared: boolean;
-  shared_subject_code: string | null;
 }
 
 export interface CreateSubjectData {
@@ -18,8 +17,8 @@ export interface CreateSubjectData {
   name: string;
   department: string;
   year: number;
+  semester: number;
   is_shared?: boolean;
-  shared_subject_code?: string | null;
 }
 
 export const subjectService = {
@@ -120,6 +119,25 @@ export const subjectService = {
     }
 
     return data;
+  },
+
+  // Bulk create subjects
+  async bulkCreateSubjects(
+    subjects: CreateSubjectData[]
+  ): Promise<Subject[]> {
+    const results: Subject[] = [];
+
+    for (const subject of subjects) {
+      try {
+        const created = await this.createSubject(subject);
+        results.push(created);
+      } catch (error) {
+        // Log error but continue with next subject
+        console.error(`Failed to create subject ${subject.subcode}:`, error);
+      }
+    }
+
+    return results;
   },
 
   // Create new subject

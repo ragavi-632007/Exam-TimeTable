@@ -448,7 +448,6 @@ export const examService = {
               department: staffData.department,
               year: 1, // Default year
               is_shared: true, // Mark as shared subject
-              shared_subject_code: staffData.subject_code,
             },
           ])
           .select()
@@ -478,10 +477,11 @@ export const examService = {
         throw new Error(`Department not found: ${trimmedDepartment}`);
       }
 
-      // Find other departments teaching the same subject
+      // Find other departments teaching the same subject (by code AND name)
       const { data: otherDeptSubjects, error: otherDeptError } = await supabase
         .from("subject_detail")
         .select("*")
+        .eq("subcode", staffData.subject_code)
         .eq("name", staffData.subject_name)
         .neq("department", staffData.department);
 
@@ -649,10 +649,11 @@ export const examService = {
         }
       }
 
-      // Find other departments teaching the same subject
+      // Find other departments teaching the same subject (by code AND name)
       const { data: otherDeptSubjects, error: otherDeptError } = await supabase
         .from("subject_detail")
         .select("*")
+        .eq("subcode", subject.subcode)
         .eq("name", subject.name)
         .eq("year", subject.year)
         .neq("department", subject.department);
@@ -842,7 +843,6 @@ export const examService = {
           department: examData.department,
           year: examData.year,
           is_shared: false,
-          shared_subject_code: null,
         },
       ])
       .select()

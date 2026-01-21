@@ -7,8 +7,10 @@ import {
   CheckCircle,
   XCircle,
   ChevronDown,
+  Upload,
+  Download,
 } from "lucide-react";
-import {subjectService, Subject} from "../services/subjectService";
+import {CreateSubjectData, subjectService, Subject} from "../services/subjectService";
 import {examService} from "../services/examService";
 
 interface SubjectWithSchedule extends Subject {
@@ -29,6 +31,13 @@ export const SubjectManagement: React.FC = () => {
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showSemesterDropdown, setShowSemesterDropdown] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [bulkUploadErrors, setBulkUploadErrors] = useState<string[]>([]);
+  const [bulkUploadSummary, setBulkUploadSummary] = useState<{
+    inserted: number;
+  } | null>(null);
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [newSubject, setNewSubject] = useState({
     subcode: "",
     name: "",
@@ -123,6 +132,172 @@ export const SubjectManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetBulkUploadState = () => {
+    setBulkUploadErrors([]);
+    setBulkUploadSummary(null);
+    setSelectedFileName("");
+    setIsBulkUploading(false);
+  };
+
+  const downloadTemplate = () => {
+    const header = "subcode,name,department,year,semester\n";
+    const sampleRows = [
+      "CS101,Programming Fundamentals,CSE,1,1",
+      "MA101,Calculus I,Mathematics,1,1",
+    ].join("\n");
+    const blob = new Blob([`${header}${sampleRows}\n`], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "subject_template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const splitCsvLine = (line: string) => {
+    const cells: string[] = [];
+    let current = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        insideQuotes = !insideQuotes;
+        continue;
+      }
+
+      if (char === "," && !insideQuotes) {
+        cells.push(current);
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+
+    cells.push(current);
+    return cells;
+  };
+
+  const parseCsv = (
+    csvText: string
+  ): { records: CreateSubjectData[]; errors: string[] } => {
+    const errors: string[] = [];
+    const trimmed = csvText.trim();
+
+    if (!trimmed) {
+      errors.push("The CSV file is empty.");
+      return { records: [], errors };
+    }
+
+    const lines = trimmed
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0);
+
+    if (lines.length < 2) {
+      errors.push("No data rows found in the CSV.");
+      return { records: [], errors };
+    }
+
+    const headers = splitCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+    const requiredHeaders = ["subcode", "name", "department", "year", "semester"];
+    const missing = requiredHeaders.filter((header) => !headers.includes(header));
+
+    if (missing.length) {
+      errors.push(`Missing columns: ${missing.join(", ")}`);
+      return { records: [], errors };
+    }
+
+    const records: CreateSubjectData[] = [];
+
+    lines.slice(1).forEach((line, index) => {
+      if (!line.trim()) return;
+
+      const values = splitCsvLine(line).map((value) => value.trim());
+      const row: Record<string, string> = {};
+
+      headers.forEach((header, idx) => {
+        row[header] = values[idx] ?? "";
+      });
+
+      const year = Number(row.year);
+      const semester = Number(row.semester);
+
+      if (
+        !row.subcode ||
+        !row.name ||
+        !row.department ||
+        Number.isNaN(year) ||
+        Number.isNaN(semester)
+      ) {
+        errors.push(`Row ${index + 2}: Missing or invalid data.`);
+        return;
+      }
+
+      records.push({
+        subcode: row.subcode,
+        name: row.name,
+        department: row.department,
+        year,
+        semester,
+        is_shared: row.is_shared?.toLowerCase() === "true",
+      });
+    });
+
+    return { records, errors };
+  };
+
+  const handleBulkFile = (file: File) => {
+    setBulkUploadErrors([]);
+    setBulkUploadSummary(null);
+    setIsBulkUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const text = (reader.result as string) || "";
+        const { records, errors } = parseCsv(text);
+
+        if (errors.length) {
+          setBulkUploadErrors(errors);
+          return;
+        }
+
+        if (!records.length) {
+          setBulkUploadErrors(["No valid rows found in the CSV."]);
+          return;
+        }
+
+        const created = await subjectService.bulkCreateSubjects(records);
+        setBulkUploadSummary({ inserted: created.length });
+        await loadSubjects();
+      } catch (error) {
+        console.error("Bulk upload failed:", error);
+        setBulkUploadErrors([
+          error instanceof Error ? error.message : "Failed to upload subjects.",
+        ]);
+      } finally {
+        setIsBulkUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setBulkUploadErrors(["Unable to read the selected file."]);
+      setIsBulkUploading(false);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFileName(file.name);
+    handleBulkFile(file);
+    event.target.value = "";
   };
 
   const filteredSubjects = subjects.filter((subject) => {
@@ -274,12 +449,24 @@ export const SubjectManagement: React.FC = () => {
             Manage subjects and view their scheduling status
           </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          Add Subject
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => {
+              resetBulkUploadState();
+              setShowBulkUpload(true);
+            }}
+            className="px-4 py-2 border border-blue-200 text-blue-700 bg-white rounded-lg hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center space-x-2"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Bulk Upload CSV</span>
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Add Subject
+          </button>
+        </div>
       </div>
 
       {/* Add Subject Modal */}
@@ -360,6 +547,108 @@ export const SubjectManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Bulk Upload Subjects</h3>
+                <p className="text-sm text-gray-600">
+                  Upload a CSV file with columns: subcode, name, department, year, semester.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkUpload(false);
+                  resetBulkUploadState();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close bulk upload"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-sm text-blue-800">
+              <p className="font-semibold">Tips</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>One subject per row.</li>
+                <li>Year and semester must be numbers.</li>
+                <li>Existing subject codes are ignored to avoid duplicates.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="text-sm text-gray-700">
+                  Need a starting point? Download a ready-to-fill template.
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="inline-flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download template</span>
+                </button>
+              </div>
+
+              <label className="flex items-center justify-between w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-100 rounded-full">
+                    <Upload className="h-5 w-5 text-blue-700" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Choose CSV file</p>
+                    <p className="text-xs text-gray-500">
+                      {selectedFileName || "Only .csv files are supported"}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+              </label>
+
+              {isBulkUploading && (
+                <div className="text-sm text-blue-700">Uploading subjects...</div>
+              )}
+
+              {bulkUploadSummary && (
+                <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-md p-3">
+                  Successfully uploaded {bulkUploadSummary.inserted} subjects.
+                </div>
+              )}
+
+              {bulkUploadErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3 space-y-1">
+                  {bulkUploadErrors.map((error, idx) => (
+                    <div key={idx}>• {error}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkUpload(false);
+                  resetBulkUploadState();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

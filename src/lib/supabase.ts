@@ -85,7 +85,6 @@ export interface Database {
           created_at: string;
           updated_at: string;
           is_shared: boolean;
-          shared_subject_code: string | null;
         };
         Insert: {
           id?: string;
@@ -97,7 +96,6 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           is_shared?: boolean;
-          shared_subject_code?: string | null;
         };
         Update: {
           id?: string;
@@ -109,7 +107,6 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           is_shared?: boolean;
-          shared_subject_code?: string | null;
         };
       };
       exam_settings: {

@@ -11,7 +11,6 @@ const adminName = 'Admin User';
 const adminDepartment = 'ADMIN';
 
 const main = async () => {
-  // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await client.auth.signUp({
     email: adminEmail,
     password: adminPassword
@@ -49,7 +48,6 @@ const main = async () => {
   console.log('Email:', adminEmail);
   console.log('Password:', adminPassword);
 
-  // 3. Verify admin exists
   const { data: admins, error: adminError } = await client.from('staff_details').select('*').eq('role', 'admin');
   if (adminError) {
     console.error('Error verifying admin:', adminError);
