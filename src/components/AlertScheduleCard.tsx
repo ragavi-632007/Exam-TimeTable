@@ -79,10 +79,43 @@ export const AlertScheduleCard: React.FC<AlertScheduleCardProps> = ({
     return relevantExams.filter((exam) => exam.status === "pending");
   }, [relevantExams]);
 
-  // Get scheduled exams (those with status === "scheduled" or those in scheduledExams prop)
+  // Get scheduled exams (those with status === "scheduled" and within alert date range)
   const scheduledExamsForAlert = useMemo(() => {
-    return relevantExams.filter((exam) => exam.status === "scheduled");
-  }, [relevantExams]);
+    const startDate = alert.startDate ? new Date(alert.startDate) : null;
+    const endDate = alert.endDate ? new Date(alert.endDate) : null;
+    
+    return relevantExams.filter((exam) => {
+      if (exam.status !== "scheduled") return false;
+      
+      // Check if scheduled date falls within alert date range
+      const scheduledDate = exam.scheduledDate ? new Date(exam.scheduledDate) : null;
+      if (!scheduledDate) return false;
+      
+      if (startDate && scheduledDate < startDate) return false;
+      if (endDate && scheduledDate > endDate) return false;
+      
+      return true;
+    });
+  }, [relevantExams, alert.startDate, alert.endDate]);
+
+  // Get exams scheduled outside the alert date range (to be rescheduled)
+  const outsideRangeExams = useMemo(() => {
+    const startDate = alert.startDate ? new Date(alert.startDate) : null;
+    const endDate = alert.endDate ? new Date(alert.endDate) : null;
+    
+    return relevantExams.filter((exam) => {
+      if (exam.status !== "scheduled") return false;
+      
+      const scheduledDate = exam.scheduledDate ? new Date(exam.scheduledDate) : null;
+      if (!scheduledDate) return false;
+      
+      // Return exams scheduled OUTSIDE the alert date range
+      if (startDate && scheduledDate < startDate) return true;
+      if (endDate && scheduledDate > endDate) return true;
+      
+      return false;
+    });
+  }, [relevantExams, alert.startDate, alert.endDate]);
 
   const parseYMD = (dateStr?: string | null): Date | null => {
     if (!dateStr || typeof dateStr !== 'string') return null;
@@ -196,7 +229,7 @@ export const AlertScheduleCard: React.FC<AlertScheduleCardProps> = ({
           )}
 
           {/* Exams to Schedule */}
-          {pendingExamsForAlert.length === 0 ? (
+          {pendingExamsForAlert.length === 0 && outsideRangeExams.length === 0 ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
               <p className="text-sm text-blue-800">
                 No pending exams to schedule for Year {alert.year}, {getSemesterLabel(alert.semester)}
@@ -205,83 +238,176 @@ export const AlertScheduleCard: React.FC<AlertScheduleCardProps> = ({
           ) : (
             <div className="space-y-3">
               <h4 className="font-medium text-gray-900">Exams to Schedule</h4>
-              <div className="space-y-3">
-                {pendingExamsForAlert.map((exam) => {
-                  return (
-                    <div
-                      key={exam.id}
-                      className="bg-white rounded-lg p-3 border border-gray-200"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">
-                            {exam.subjectName}
-                          </h5>
-                          <p className="text-xs text-gray-600 mt-1">
-                            Code: {exam.subjectCode}
-                          </p>
+              
+              {/* Exams scheduled outside alert date range */}
+              {outsideRangeExams.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-yellow-800 mb-3 font-medium">
+                    ⚠️ The following exams are scheduled outside the alert date range and need to be rescheduled:
+                  </p>
+                  <div className="space-y-3">
+                    {outsideRangeExams.map((exam) => {
+                      return (
+                        <div
+                          key={exam.id}
+                          className="bg-white rounded-lg p-3 border border-yellow-200"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h5 className="font-medium text-gray-900">
+                                {exam.subjectName}
+                              </h5>
+                              <p className="text-xs text-gray-600 mt-1">
+                                Code: {exam.subjectCode}
+                              </p>
+                              <p className="text-xs text-yellow-700 mt-2">
+                                Currently scheduled for: {exam.scheduledDate}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <DatePicker
+                                selected={
+                                  selectedDates[exam.id]
+                                    ? parseYMD(selectedDates[exam.id])
+                                    : null
+                                }
+                                onChange={(d: Date | null) => {
+                                  const value = d ? format(d, 'yyyy-MM-dd') : '';
+                                  setSelectedDates((prev) => ({
+                                    ...prev,
+                                    [exam.id]: value,
+                                  }));
+                                }}
+                                minDate={parseYMD(alert.startDate) ?? undefined}
+                                maxDate={parseYMD(alert.endDate) ?? undefined}
+                                filterDate={(d: Date) => {
+                                  // Exclude Sundays
+                                  if (d.getDay() === 0) return false;
+                                  const ds = format(d, 'yyyy-MM-dd');
+                                  // Exclude already scheduled dates for same dept+year
+                                  const scheduledSet = new Set(
+                                    scheduledExams
+                                      .filter(
+                                        (se) =>
+                                          se.department === exam.department &&
+                                          se.year === exam.year
+                                      )
+                                      .map((se) => se.scheduledDate)
+                                      .filter(Boolean)
+                                  );
+                                  if (scheduledSet.has(ds)) return false;
+                                  return true;
+                                }}
+                                placeholderText="Select new date"
+                                dateFormat="yyyy-MM-dd"
+                                className="px-2 py-1 border border-gray-300 rounded text-xs"
+                              />
+                              <button
+                                onClick={async () => {
+                                  await handleScheduleExam(
+                                    exam.id,
+                                    selectedDates[exam.id]
+                                  );
+                                }}
+                                disabled={
+                                  !selectedDates[exam.id] ||
+                                  !!schedulingLoading[exam.id]
+                                }
+                                className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                {schedulingLoading[exam.id]
+                                  ? 'Rescheduling...'
+                                  : 'Reschedule'}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <DatePicker
-                            selected={
-                              selectedDates[exam.id]
-                                ? parseYMD(selectedDates[exam.id])
-                                : null
-                            }
-                            onChange={(d: Date | null) => {
-                              const value = d ? format(d, 'yyyy-MM-dd') : '';
-                              setSelectedDates((prev) => ({
-                                ...prev,
-                                [exam.id]: value,
-                              }));
-                            }}
-                            minDate={parseYMD(alert.startDate) ?? undefined}
-                            maxDate={parseYMD(alert.endDate) ?? undefined}
-                            filterDate={(d: Date) => {
-                              // Exclude Sundays
-                              if (d.getDay() === 0) return false;
-                              const ds = format(d, 'yyyy-MM-dd');
-                              // Exclude already scheduled dates for same dept+year
-                              const scheduledSet = new Set(
-                                scheduledExams
-                                  .filter(
-                                    (se) =>
-                                      se.department === exam.department &&
-                                      se.year === exam.year
-                                  )
-                                  .map((se) => se.scheduledDate)
-                                  .filter(Boolean)
-                              );
-                              if (scheduledSet.has(ds)) return false;
-                              return true;
-                            }}
-                            placeholderText="Select date"
-                            dateFormat="yyyy-MM-dd"
-                            className="px-2 py-1 border border-gray-300 rounded text-xs"
-                          />
-                          <button
-                            onClick={async () => {
-                              await handleScheduleExam(
-                                exam.id,
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Pending exams */}
+              {pendingExamsForAlert.length > 0 && (
+                <div className="space-y-3">
+                  {pendingExamsForAlert.map((exam) => {
+                    return (
+                      <div
+                        key={exam.id}
+                        className="bg-white rounded-lg p-3 border border-gray-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h5 className="font-medium text-gray-900">
+                              {exam.subjectName}
+                            </h5>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Code: {exam.subjectCode}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DatePicker
+                              selected={
                                 selectedDates[exam.id]
-                              );
-                            }}
-                            disabled={
-                              !selectedDates[exam.id] ||
-                              !!schedulingLoading[exam.id]
-                            }
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            {schedulingLoading[exam.id]
-                              ? 'Scheduling...'
-                              : 'Schedule'}
-                          </button>
+                                  ? parseYMD(selectedDates[exam.id])
+                                  : null
+                              }
+                              onChange={(d: Date | null) => {
+                                const value = d ? format(d, 'yyyy-MM-dd') : '';
+                                setSelectedDates((prev) => ({
+                                  ...prev,
+                                  [exam.id]: value,
+                                }));
+                              }}
+                              minDate={parseYMD(alert.startDate) ?? undefined}
+                              maxDate={parseYMD(alert.endDate) ?? undefined}
+                              filterDate={(d: Date) => {
+                                // Exclude Sundays
+                                if (d.getDay() === 0) return false;
+                                const ds = format(d, 'yyyy-MM-dd');
+                                // Exclude already scheduled dates for same dept+year
+                                const scheduledSet = new Set(
+                                  scheduledExams
+                                    .filter(
+                                      (se) =>
+                                        se.department === exam.department &&
+                                        se.year === exam.year
+                                    )
+                                    .map((se) => se.scheduledDate)
+                                    .filter(Boolean)
+                                );
+                                if (scheduledSet.has(ds)) return false;
+                                return true;
+                              }}
+                              placeholderText="Select date"
+                              dateFormat="yyyy-MM-dd"
+                              className="px-2 py-1 border border-gray-300 rounded text-xs"
+                            />
+                            <button
+                              onClick={async () => {
+                                await handleScheduleExam(
+                                  exam.id,
+                                  selectedDates[exam.id]
+                                );
+                              }}
+                              disabled={
+                                !selectedDates[exam.id] ||
+                                !!schedulingLoading[exam.id]
+                              }
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              {schedulingLoading[exam.id]
+                                ? 'Scheduling...'
+                                : 'Schedule'}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

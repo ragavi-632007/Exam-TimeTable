@@ -1008,6 +1008,8 @@ export const TeacherDashboard: React.FC = () => {
                                 exam.year === selectedYear &&
                                 exam.semester === selectedAlert?.semester
                             )}
+                            startDate={selectedAlert?.startDate}
+                            endDate={selectedAlert?.endDate}
                           />
                         );
                       })()}

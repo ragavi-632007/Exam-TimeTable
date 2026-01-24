@@ -15,9 +15,11 @@ interface ScheduledExam {
 
 interface ExamTimetablePreviewProps {
   scheduledExams: ScheduledExam[];
+  startDate?: string;
+  endDate?: string;
 }
 
-export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ scheduledExams }) => {
+export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ scheduledExams, startDate, endDate }) => {
   const [loading, setLoading] = useState(true);
 
   // Define all departments based on the image description
@@ -30,14 +32,32 @@ export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ sche
     setLoading(false);
   }, [scheduledExams]);
 
-  // Get unique dates from scheduled exams and sort them
-  const uniqueDates = [...new Set(scheduledExams.filter(exam => exam?.examDate).map(exam => exam.examDate))].sort();
+  // Filter exams by date range if provided
+  const filteredExams = React.useMemo(() => {
+    if (!startDate && !endDate) return scheduledExams;
+    
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    
+    return scheduledExams.filter(exam => {
+      const examDate = exam.examDate ? new Date(exam.examDate) : null;
+      if (!examDate) return false;
+      
+      if (start && examDate < start) return false;
+      if (end && examDate > end) return false;
+      
+      return true;
+    });
+  }, [scheduledExams, startDate, endDate]);
+
+  // Get unique dates from filtered exams and sort them
+  const uniqueDates = [...new Set(filteredExams.filter(exam => exam?.examDate).map(exam => exam.examDate))].sort();
 
   // Group exams by date and department
   const examsByDateAndDept = uniqueDates.reduce((acc, date) => {
     acc[date!] = allDepartments.reduce((deptAcc, dept) => {
       // Match by department name
-      const exam = scheduledExams.find(e => {
+      const exam = filteredExams.find(e => {
         const examDept = e.department?.trim();
         return e.examDate === date && examDept === dept;
       });
@@ -65,7 +85,7 @@ export const ExamTimetablePreview: React.FC<ExamTimetablePreviewProps> = ({ sche
           <div className="flex items-center">
             <Calendar className="h-5 w-5 text-green-500 mr-2" />
             <h3 className="text-lg font-medium text-gray-900">
-              Year {scheduledExams[0]?.year || scheduledExams[0]?.subject_detail?.year || ''} Exam Schedule
+              Year {filteredExams[0]?.year || filteredExams[0]?.subject_detail?.year || ''} Exam Schedule
             </h3>
           </div>
           <div className="text-sm text-gray-500">

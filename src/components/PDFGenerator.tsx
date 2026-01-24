@@ -191,18 +191,32 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   // Align preview logic with PDF export logic
   const previewScheduleMap = useMemo(() => {
     const map = new Map();
+    
+    // Get the selected alert's date range if available
+    const selectedAlert = selectedAlertId ? alerts.find((a) => a.id === selectedAlertId) : null;
+    const startDateFilter = selectedAlert?.startDate ? new Date(selectedAlert.startDate) : null;
+    const endDateFilter = selectedAlert?.endDate ? new Date(selectedAlert.endDate) : null;
+    
     scheduledExams.forEach((exam) => {
       const dateRaw = (exam.scheduledDate || exam.examDate) as string | undefined;
       if (!dateRaw || !exam.department) return;
       const examYear = Number(exam.year ?? exam.subject_detail?.year);
       if (examYear !== selectedYear) return;
       if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
+      
+      // Filter by alert date range if an alert is selected
+      if (selectedAlertId && (startDateFilter || endDateFilter)) {
+        const examDate = new Date(dateRaw);
+        if (startDateFilter && examDate < startDateFilter) return;
+        if (endDateFilter && examDate > endDateFilter) return;
+      }
+      
       const date = new Date(dateRaw).toLocaleDateString("en-GB");
       if (!map.has(date)) map.set(date, {});
       map.get(date)[exam.department] = exam;
     });
     return map;
-  }, [scheduledExams, selectedYear, selectedSemester, selectedExam]);
+  }, [scheduledExams, selectedYear, selectedSemester, selectedExam, selectedAlertId, alerts]);
   const previewSortedDates = Array.from(previewScheduleMap.keys()).sort((a, b) => {
     const [da, ma, ya] = a.split("/").map(Number);
     const [db, mb, yb] = b.split("/").map(Number);
