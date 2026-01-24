@@ -429,8 +429,14 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         colX += colWidths[i];
       }
 
-      // Build schedule data: group by date, then by department (filtered by year and semester)
+      // Build schedule data: group by date, then by department (filtered by year, semester, and alert date range)
       const scheduleMap = new Map();
+      
+      // Get the selected alert's date range
+      const selectedAlert = selectedAlertId ? alerts.find((a) => a.id === selectedAlertId) : null;
+      const alertStartDate = selectedAlert?.startDate ? new Date(selectedAlert.startDate) : null;
+      const alertEndDate = selectedAlert?.endDate ? new Date(selectedAlert.endDate) : null;
+      
       scheduledExams.forEach((exam) => {
         const dateRaw = (exam.scheduledDate || exam.examDate) as string | undefined;
         if (!dateRaw || !exam.department) return;
@@ -438,6 +444,14 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         const examYear = Number(exam.year ?? exam.subject_detail?.year);
         if (examYear !== selectedYear) return;
         if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
+        
+        // Filter by alert date range if an alert is selected
+        if (selectedAlertId && (alertStartDate || alertEndDate)) {
+          const examDate = new Date(dateRaw);
+          if (alertStartDate && examDate < alertStartDate) return;
+          if (alertEndDate && examDate > alertEndDate) return;
+        }
+        
         const date = new Date(dateRaw).toLocaleDateString("en-GB");
         if (!scheduleMap.has(date)) scheduleMap.set(date, {});
         scheduleMap.get(date)[exam.department] = exam;
