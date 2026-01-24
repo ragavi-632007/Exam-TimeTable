@@ -277,12 +277,30 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     loadData();
   }, []);
 
-  // Sync semester when alert is selected
+  // Sync semester and refId when alert is selected
   useEffect(() => {
     if (selectedAlertId) {
       const selectedAlert = alerts.find((a) => a.id === selectedAlertId);
-      if (selectedAlert && selectedAlert.semester) {
-        setSelectedSemester(String(selectedAlert.semester));
+      if (selectedAlert) {
+        if (selectedAlert.semester) {
+          setSelectedSemester(String(selectedAlert.semester));
+        }
+        // Auto-populate refId from alert
+        if (selectedAlert.refId) {
+          console.log('Alert refId:', selectedAlert.refId);
+          const parts = selectedAlert.refId.split('/').filter(p => p.trim() !== '');
+          console.log('RefId parts:', parts);
+          if (parts.length >= 3) {
+            setRefId1(parts[parts.length - 3] || '');
+            setRefId2(parts[parts.length - 2] || '');
+            setRefId3(parts[parts.length - 1] || '');
+          } else if (parts.length >= 1) {
+            // If less than 3 parts, still populate what we have
+            setRefId1(parts[0] || '');
+            setRefId2(parts[1] || '');
+            setRefId3(parts[2] || '');
+          }
+        }
       }
     }
   }, [selectedAlertId, alerts]);
@@ -294,6 +312,9 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       const pageWidth = pdf.internal.pageSize.width;
   // Removed unused pageHeight
       let y = 12;
+      
+      // Get the selected alert early for use throughout the function
+      const selectedAlert = selectedAlertId ? alerts.find((a) => a.id === selectedAlertId) : null;
       // Helper to load image from public as base64 (not used currently)
       // const loadImageAsBase64 = (url: string): Promise<string> => {
       //   return new Promise((resolve, reject) => {
@@ -360,32 +381,40 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // --- Circular content (dynamic, similar to preview page) ---
       pdf.setFontSize(11);
       pdf.setFont("helvetica", "normal");
-      // Find the earliest exam date for the selected year and exam type
-      let minExamDate: Date | null = null;
-      scheduledExams
-        .filter((exam) => {
-          const examYear = Number(exam.year ?? exam.subject_detail?.year);
-          const matchesYear = examYear === selectedYear;
-          const hasDate = Boolean(exam.scheduledDate || exam.examDate);
-          const matchesSem = selectedSemester ? String(exam.semester ?? exam.sem ?? "") === selectedSemester : true;
-          return matchesYear && matchesSem && hasDate;
-        })
-        .forEach((exam) => {
-          const raw = (exam.scheduledDate || exam.examDate) as string;
-          const d = new Date(raw);
-          if (!isNaN(d.getTime())) {
-            if (!minExamDate || d.getTime() < (minExamDate as Date).getTime()) {
-              minExamDate = d;
+      
+      // If alert is selected, use its startDate; otherwise find the earliest exam date
+      let startDateStr: string;
+      if (selectedAlertId && selectedAlert?.startDate) {
+        startDateStr = new Date(selectedAlert.startDate).toLocaleDateString("en-GB");
+      } else {
+        // Find the earliest exam date for the selected year and exam type
+        let minExamDate: Date | null = null;
+        scheduledExams
+          .filter((exam) => {
+            const examYear = Number(exam.year ?? exam.subject_detail?.year);
+            const matchesYear = examYear === selectedYear;
+            const hasDate = Boolean(exam.scheduledDate || exam.examDate);
+            const matchesSem = selectedSemester ? String(exam.semester ?? exam.sem ?? "") === selectedSemester : true;
+            return matchesYear && matchesSem && hasDate;
+          })
+          .forEach((exam) => {
+            const raw = (exam.scheduledDate || exam.examDate) as string;
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) {
+              if (!minExamDate || d.getTime() < (minExamDate as Date).getTime()) {
+                minExamDate = d;
+              }
             }
-          }
-        });
-      let startDateStr =
-        minExamDate && !isNaN((minExamDate as Date).getTime())
-          ? (minExamDate as Date).toLocaleDateString("en-GB")
-          : dynamicStartDate || "____";
-      // Use selectedExam and selectedYear for circular text, match preview page wording
-      const alertExamType = (matchedAlert?.examType || (matchedAlert as any)?.exam_type) as string | undefined;
-      const alertYear = matchedAlert?.year as number | string | undefined;
+          });
+        startDateStr =
+          minExamDate && !isNaN((minExamDate as Date).getTime())
+            ? (minExamDate as Date).toLocaleDateString("en-GB")
+            : dynamicStartDate || "____";
+      }
+      // Use selectedAlert's examType if alert is selected; otherwise use matchedAlert
+      const alertForExamType = selectedAlert || matchedAlert;
+      const alertExamType = (alertForExamType?.examType || (alertForExamType as any)?.exam_type) as string | undefined;
+      const alertYear = alertForExamType?.year as number | string | undefined;
       const effectiveExamType = alertExamType || selectedExam;
       const effectiveYearStr = String(alertYear ?? selectedYear);
       const examName = effectiveExamType === "IA1" ? "Internal Assessment-I" 
@@ -397,9 +426,10 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       const lines = pdf.splitTextToSize(circularText, pageWidth - 40);
       pdf.text(lines, 12, y + 8);
 
-
-      // Dynamic Table
-      const tableY = y + 20;
+      // Calculate dynamic Y position after circular text
+      const lineHeight = 5;
+      const circularTextHeight = lines.length * lineHeight;
+      const tableY = y + 8 + circularTextHeight + 10;
       const tableX = 12;
       const tableWidth = pageWidth - 24;
       // Dynamic department codes for headers (sorted by code)
@@ -432,8 +462,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Build schedule data: group by date, then by department (filtered by year, semester, and alert date range)
       const scheduleMap = new Map();
       
-      // Get the selected alert's date range
-      const selectedAlert = selectedAlertId ? alerts.find((a) => a.id === selectedAlertId) : null;
+      // Get alert date range for filtering
       const alertStartDate = selectedAlert?.startDate ? new Date(selectedAlert.startDate) : null;
       const alertEndDate = selectedAlert?.endDate ? new Date(selectedAlert.endDate) : null;
       
