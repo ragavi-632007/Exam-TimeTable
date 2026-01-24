@@ -991,16 +991,6 @@ export const examService = {
 
     console.log('Raw exam settings data:', settings);
 
-    // Get all departments (for mapping to alerts)
-    const { data: departments, error: deptError } = await supabase
-      .from("departments")
-      .select("*");
-
-    if (deptError) {
-      console.error('Error fetching departments:', deptError);
-      throw new Error(deptError.message);
-    }
-
     const alerts = settings
       .filter(setting => setting?.year && setting.exam_start_date && setting.exam_end_date)
       .map((setting): ExamAlert => ({
@@ -1011,7 +1001,7 @@ export const examService = {
         year: Number(setting.year),
         semester: setting.semester || 0,
         refId: setting.refid || undefined,
-        departments: departments.map(d => d.name),
+        departments: [],
         status: "active",
         createdAt: setting.created_at,
         examType: setting.exam_type,

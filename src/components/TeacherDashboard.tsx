@@ -18,6 +18,7 @@ import DatePicker from 'react-datepicker';
 import { format } from 'date-fns';
 import { EditExamSchedule } from "./EditExamSchedule";
 import { ExamTimetablePreview } from "./ExamTimetablePreview";
+import { AlertScheduleCard } from "./AlertScheduleCard";
 import { examService } from "../services/examService";
 
 export const TeacherDashboard: React.FC = () => {
@@ -40,6 +41,7 @@ export const TeacherDashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<ExamAlert[]>([]);
   const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
   const [schedulingLoading, setSchedulingLoading] = useState<Record<string, boolean>>({});
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
 
   // ...existing code...
 
@@ -56,19 +58,24 @@ export const TeacherDashboard: React.FC = () => {
     { value: "MODEL", label: "Model Examination" },
   ];
 
-  // Update exam dates based on selected year and alerts from context
+  // Update exam dates based on selected year, semester, and exam type
   useEffect(() => {
     setAlerts(ctxAlerts || []);
-    const yearAlerts = ctxAlerts?.filter(
+    const alertExamType = mapExamTypeToAlertFormat(selectedExamType);
+    const relevantAlerts = ctxAlerts?.filter(
       alert => alert.year === selectedYear && 
-      alert.departments?.map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+               alert.semester === selectedSemester && 
+               alert.examType === alertExamType
     ) || [];
     
-    if (yearAlerts.length > 0) {
-      setExamStartDate(yearAlerts[0].startDate || "");
-      setExamEndDate(yearAlerts[0].endDate || "");
+    if (relevantAlerts.length > 0) {
+      setExamStartDate(relevantAlerts[0].startDate || "");
+      setExamEndDate(relevantAlerts[0].endDate || "");
+    } else {
+      setExamStartDate("");
+      setExamEndDate("");
     }
-  }, [ctxAlerts, selectedYear, user?.department]);
+  }, [ctxAlerts, selectedYear, selectedSemester, selectedExamType, user?.department]);
 
   // Ensure semester options follow the selected year
   useEffect(() => {
@@ -107,18 +114,73 @@ export const TeacherDashboard: React.FC = () => {
     (e: any) => e.year === 4 && e.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase()
   );
 
+  // Get year label
+  const getYearLabel = (year: number): string => {
+    const labels: Record<number, string> = {
+      1: '1ST', 2: '2ND', 3: '3RD', 4: '4TH',
+    };
+    return labels[year] || `${year}`;
+  };
+
+  // Get exam type label
+  const getExamTypeLabel = (examType?: string): string => {
+    const labelMap: Record<string, string> = {
+      'Internal Assessment-I': 'IA 1',
+      'Internal Assessment-II': 'IA 2',
+      'Model Exam': 'MODEL',
+      'IA1': 'IA 1',
+      'IA2': 'IA 2',
+      'MODEL': 'MODEL',
+    };
+    return labelMap[examType || ''] || examType || 'Unknown';
+  };
+
+  // Get semester label
+  const getSemesterLabel = (sem: number): string => {
+    const labels: Record<number, string> = {
+      1: 'SEM 1', 2: 'SEM 2', 3: 'SEM 3', 4: 'SEM 4',
+      5: 'SEM 5', 6: 'SEM 6', 7: 'SEM 7', 8: 'SEM 8',
+    };
+    return labels[sem] || `SEM ${sem}`;
+  };
+
+  // Generate user-friendly alert title
+  const getAlertTitle = (alert: ExamAlert): string => {
+    const year = getYearLabel(alert.year);
+    const sem = getSemesterLabel(alert.semester);
+    const examType = getExamTypeLabel(alert.examType);
+    return `${year} YEAR ${sem} ${examType}`;
+  };
+
+  // Map selectedExamType to alert examType format
+  const mapExamTypeToAlertFormat = (examType: string): string => {
+    const typeMap: Record<string, string> = {
+      "IA1": "Internal Assessment-I",
+      "IA2": "Internal Assessment-II",
+      "MODEL": "Model Exam"
+    };
+    return typeMap[examType] || examType;
+  };
+
   const alertsYear1 = alerts.filter(
-    (a) => a.year === 1 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+    (a) => a.year === 1
   );
   const alertsYear2 = alerts.filter(
-    (a) => a.year === 2 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+    (a) => a.year === 2
   );
   const alertsYear3 = alerts.filter(
-    (a) => a.year === 3 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+    (a) => a.year === 3
   );
   const alertsYear4 = alerts.filter(
-    (a) => a.year === 4 && (a.departments || []).map(d => d.trim().toLowerCase()).includes((user?.department || "").trim().toLowerCase())
+    (a) => a.year === 4
   );
+
+  // Get alerts for the selected semester and exam type
+  const getSemesterAlerts = (year: number) => {
+    const yearAlerts = year === 1 ? alertsYear1 : year === 2 ? alertsYear2 : year === 3 ? alertsYear3 : alertsYear4;
+    const alertExamType = mapExamTypeToAlertFormat(selectedExamType);
+    return yearAlerts.filter((a) => a.semester === selectedSemester && a.examType === alertExamType);
+  };
 
   const handleUpdateSchedule = async () => {
     // Refresh data after update
@@ -421,7 +483,7 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900">{alertsYear1.length}</p>
+                          <p className="text-3xl font-bold text-gray-900">{getSemesterAlerts(1).length}</p>
                           <p className="text-sm text-gray-600">Total Alerts</p>
                         </div>
                       </div>
@@ -497,7 +559,7 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900">{alertsYear2.length}</p>
+                          <p className="text-3xl font-bold text-gray-900">{getSemesterAlerts(2).length}</p>
                           <p className="text-sm text-gray-600">Total Alerts</p>
                         </div>
                       </div>
@@ -573,7 +635,7 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900">{alertsYear3.length}</p>
+                          <p className="text-3xl font-bold text-gray-900">{getSemesterAlerts(3).length}</p>
                           <p className="text-sm text-gray-600">Total Alerts</p>
                         </div>
                       </div>
@@ -649,7 +711,7 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900">{alertsYear4.length}</p>
+                          <p className="text-3xl font-bold text-gray-900">{getSemesterAlerts(4).length}</p>
                           <p className="text-sm text-gray-600">Total Alerts</p>
                         </div>
                       </div>
@@ -771,72 +833,6 @@ export const TeacherDashboard: React.FC = () => {
               {/* Schedule Tab */}
               {activeTab === "schedule" && (
                 <div className="space-y-6">
-                  {/* Error Display */}
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-center">
-                        <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                        <div className="flex-1">
-                          <h3 className="text-sm font-medium text-red-800">
-                            Scheduling Error
-                          </h3>
-                          <p className="text-sm text-red-700 mt-1">{error}</p>
-                        </div>
-                        <button
-                          onClick={() => setError(null)}
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          <span className="sr-only">Dismiss</span>
-                          <svg
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Success Display */}
-                  {success && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="flex items-center">
-                        <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                        <div className="flex-1">
-                          <h3 className="text-sm font-medium text-green-800">
-                            Success!
-                          </h3>
-                          <p className="text-sm text-green-700 mt-1">
-                            {success}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setSuccess(null)}
-                          className="text-green-400 hover:text-green-600"
-                        >
-                          <span className="sr-only">Dismiss</span>
-                          <svg
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h2 className="text-2xl font-bold text-gray-900">
@@ -844,252 +840,37 @@ export const TeacherDashboard: React.FC = () => {
                       </h2>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-sm p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Year:
-                          </label>
-                          <select
-                            value={selectedYear}
-                            onChange={(e) =>
-                              setSelectedYear(Number(e.target.value) as 1 | 2 | 3 | 4)
-                            }
-                            className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            <option value={1}>I Year</option>
-                            <option value={2}>II Year</option>
-                            <option value={3}>III Year</option>
-                            <option value={4}>IV Year</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Semester:
-                          </label>
-                          <select
-                            value={selectedSemester}
-                            onChange={(e) => setSelectedSemester(Number(e.target.value))}
-                            className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            {(selectedYear === 1
-                              ? [1, 2]
-                              : selectedYear === 2
-                              ? [3, 4]
-                              : selectedYear === 3
-                              ? [5, 6]
-                              : [7, 8]
-                            ).map((sem) => (
-                              <option key={sem} value={sem}>
-                                Semester {sem}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Exam Type:
-                          </label>
-                          <select
-                            value={selectedExamType}
-                            onChange={(e) =>
-                              setSelectedExamType(
-                                e.target.value as "IA1" | "IA2" | "MODEL"
-                              )
-                            }
-                            className="w-full form-select rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            {examTypes.map((type) => (
-                              <option key={type.value} value={type.value}>
-                                {type.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pending Exams Section */}
-                  <div className="bg-white rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center">
-                        <AlertTriangle className="h-5 w-5 text-orange-500 mr-2" />
-                        <h3 className="text-lg font-medium text-gray-900">
-                          Exams Requiring Schedule (
-                          {
-                            pendingExams.filter(
-                              (exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester)
-                            ).length
-                          }
-                          )
+                    {/* Active Alerts */}
+                    {alerts.length === 0 ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+                        <AlertTriangle className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                        <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                          No Exam Alerts Available
                         </h3>
-                      </div>
-                    </div>
-
-                    {pendingExams.filter(
-                      (exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester)
-                    ).length === 0 ? (
-                      <div className="px-6 py-8 text-center">
-                        <p className="text-gray-500">
-                          No pending exams to schedule for Year {selectedYear}, Semester {selectedSemester}
+                        <p className="text-blue-700">
+                          No exam alerts have been created yet. Once the administration creates exam alerts, they will appear here for scheduling.
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-200">
-                        {pendingExams
-                          .filter((exam: any) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester))
-                          .map((exam: any) => (
-                            <div key={exam.id} className="px-6 py-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-3">
-                                    <h3 className="text-base font-medium text-gray-900">
-                                      {exam.subjectName}
-                                    </h3>
-                                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
-                                      {exam.subjectCode}
-                                    </span>
-                                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                                      Year {exam.year}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    Department: {exam.department} • Course ID:{" "}
-                                    {exam.courseId}
-                                  </p>
-                                  <p className="text-sm text-gray-600">
-                                    Schedule between: {exam.startDate} -{" "}
-                                    {exam.endDate}
-                                  </p>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  {(!examStartDate && !exam.startDate) ? (
-                                    <div className="text-sm text-yellow-700">Scheduling not available for this year</div>
-                                  ) : (
-                                    <>
-                                      <DatePicker
-                                        selected={selectedDates[exam.id] ? parseYMD(selectedDates[exam.id]) : null}
-                                        onChange={(d: Date | null) => {
-                                          const value = d ? format(d, 'yyyy-MM-dd') : '';
-                                          setSelectedDates(prev => ({ ...prev, [exam.id]: value }));
-                                        }}
-                                        minDate={parseYMD(exam.startDate || examStartDate) ?? undefined}
-                                        maxDate={parseYMD(exam.endDate || examEndDate) ?? undefined}
-                                        filterDate={(d: Date) => {
-                                          // Exclude Sundays
-                                          if (d.getDay() === 0) return false;
-                                          const ds = format(d, 'yyyy-MM-dd');
-                                          // Exclude already scheduled dates for same dept+year
-                                          const scheduledSet = new Set(scheduledExams
-                                            .filter(se => se.department === exam.department && se.year === exam.year)
-                                            .map(se => se.scheduledDate)
-                                            .filter(Boolean));
-                                          if (scheduledSet.has(ds)) return false;
-                                          return true;
-                                        }}
-                                        placeholderText="Select date"
-                                        dateFormat="yyyy-MM-dd"
-                                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                      />
-                                      <button
-                                        onClick={async () => {
-                                          const date = selectedDates[exam.id];
-                                          if (!date) {
-                                            setError('Please select a date first.');
-                                            return;
-                                          }
-                                          try {
-                                            setSchedulingLoading(prev => ({ ...prev, [exam.id]: true }));
-                                            await handleScheduleExam(exam.id, date);
-                                            setSelectedDates(prev => ({ ...prev, [exam.id]: '' }));
-                                          } finally {
-                                            setSchedulingLoading(prev => ({ ...prev, [exam.id]: false }));
-                                          }
-                                        }}
-                                        disabled={!selectedDates[exam.id] || !!schedulingLoading[exam.id]}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        {schedulingLoading[exam.id] ? 'Scheduling...' : 'Schedule'}
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Scheduled Exams Section */}
-                  <div className="bg-white rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center">
-                        <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                        <h3 className="text-lg font-medium text-gray-900">
-                          Scheduled Exams 
-                        </h3>
-                      </div>
-                    </div>
-
-                    {scheduledExams
-                      .filter((exam) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester) && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
-                      .length === 0 ? (
-                      <div className="px-6 py-8 text-center">
-                        <p className="text-gray-500">
-                          No scheduled exams yet for Year {selectedYear}, Semester {selectedSemester}
+                      <div className="space-y-4">
+                        <p className="text-gray-600 text-sm">
+                          Click on an alert to view details and schedule exams
                         </p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-200">
-                        {scheduledExams
-                          .filter((exam) => exam.year === selectedYear && (exam.semester == null || exam.semester === selectedSemester) && exam.department?.trim().toLowerCase() === user?.department?.trim().toLowerCase())
-                          .map((exam) => (
-                            <div key={exam.id} className="px-6 py-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-3">
-                                    <h3 className="text-base font-medium text-gray-900">
-                                      {exam.subjectName}
-                                    </h3>
-                                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
-                                      {exam.subjectCode}
-                                    </span>
-                                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                                      Year {exam.year}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    Department: {exam.department} • Course ID:{" "}
-                                    {exam.courseId}
-                                  </p>
-                                  <p className="text-sm font-medium text-green-600">
-                                    Scheduled for: {exam.scheduledDate}
-                                  </p>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
-                                    Confirmed
-                                  </span>
-                                  {user?.role === "admin" && (
-                                    <button
-                                      onClick={() => setEditingSchedule(exam)}
-                                      className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                                      title="Edit Schedule"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
+                        <div className="grid gap-4">
+                          {alerts.map((alert) => (
+                            <AlertScheduleCard
+                              key={alert.id}
+                              alert={alert}
+                              pendingExams={exams}
+                              scheduledExams={scheduledExams}
+                              userDepartment={user?.department || ""}
+                              onScheduleExam={handleScheduleExam}
+                            />
                           ))}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* Exam Scheduler Modal removed - scheduling is inline for teachers */}
 
                   {/* Edit Exam Schedule Modal (admins only) */}
                   {user?.role === "admin" && editingSchedule && (
@@ -1110,12 +891,15 @@ export const TeacherDashboard: React.FC = () => {
                       Timetable Preview
                     </h2>
                   </div>
-                  
-                  {/* Years tabs */}
+
+                  {/* Level 1: Year Selection */}
                   <div className="border-b border-gray-200">
                     <nav className="-mb-px flex space-x-6" aria-label="Years">
                       <button
-                        onClick={() => setSelectedYear(1)}
+                        onClick={() => {
+                          setSelectedYear(1);
+                          setSelectedAlertId(null);
+                        }}
                         className={`${
                           selectedYear === 1
                             ? 'border-blue-500 text-blue-600'
@@ -1125,7 +909,10 @@ export const TeacherDashboard: React.FC = () => {
                         1st Year
                       </button>
                       <button
-                        onClick={() => setSelectedYear(2)}
+                        onClick={() => {
+                          setSelectedYear(2);
+                          setSelectedAlertId(null);
+                        }}
                         className={`${
                           selectedYear === 2
                             ? 'border-blue-500 text-blue-600'
@@ -1135,7 +922,10 @@ export const TeacherDashboard: React.FC = () => {
                         2nd Year
                       </button>
                       <button
-                        onClick={() => setSelectedYear(3)}
+                        onClick={() => {
+                          setSelectedYear(3);
+                          setSelectedAlertId(null);
+                        }}
                         className={`${
                           selectedYear === 3
                             ? 'border-blue-500 text-blue-600'
@@ -1145,7 +935,10 @@ export const TeacherDashboard: React.FC = () => {
                         3rd Year
                       </button>
                       <button
-                        onClick={() => setSelectedYear(4)}
+                        onClick={() => {
+                          setSelectedYear(4);
+                          setSelectedAlertId(null);
+                        }}
                         className={`${
                           selectedYear === 4
                             ? 'border-blue-500 text-blue-600'
@@ -1156,11 +949,70 @@ export const TeacherDashboard: React.FC = () => {
                       </button>
                     </nav>
                   </div>
-                  
-                  {/* ExamTimetablePreview Component */}
-                  <ExamTimetablePreview 
-                    scheduledExams={scheduledExams.filter(exam => exam.year === selectedYear)} 
-                  />
+
+                  {/* Level 2: Alert Selection for Selected Year */}
+                  {!selectedAlertId && (
+                    <div className="space-y-3">
+                      <p className="text-gray-600 text-sm font-medium">
+                        Select an alert to view timetable:
+                      </p>
+                      {alerts.filter((a) => a.year === selectedYear).length === 0 ? (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                          <p className="text-sm text-blue-800">
+                            No alerts created for Year {selectedYear}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {alerts
+                            .filter((a) => a.year === selectedYear)
+                            .map((alert) => (
+                              <button
+                                key={alert.id}
+                                onClick={() => setSelectedAlertId(alert.id)}
+                                className="bg-white border border-gray-300 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition-all text-left"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium text-gray-900">
+                                      {getAlertTitle(alert)}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      {alert.startDate && new Date(alert.startDate).toLocaleDateString()} to {alert.endDate && new Date(alert.endDate).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="text-blue-600 text-lg">→</div>
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Level 3: Timetable Preview for Selected Alert */}
+                  {selectedAlertId && (
+                    <div className="space-y-4">
+                      <button
+                        onClick={() => setSelectedAlertId(null)}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        ← Back to Alerts
+                      </button>
+                      {(() => {
+                        const selectedAlert = alerts.find((a) => a.id === selectedAlertId);
+                        return (
+                          <ExamTimetablePreview
+                            scheduledExams={scheduledExams.filter(
+                              (exam) =>
+                                exam.year === selectedYear &&
+                                exam.semester === selectedAlert?.semester
+                            )}
+                          />
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
             </>

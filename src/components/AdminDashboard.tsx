@@ -223,7 +223,6 @@ export const AdminDashboard: React.FC = () => {
           <div className="text-xs text-gray-600 space-y-1">
             <p>Chennai Institute of Technology</p>
             <p>Examination Management System</p>
-            <p>TNEA Code: 1399</p>
           </div>
         </div>
       </div>
@@ -283,16 +282,6 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </header>
-        {/* Breadcrumbs */}
-        <div className="px-4 md:px-6 py-3 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-wrap items-center space-x-2 text-xs md:text-sm text-gray-600">
-            <Home className="h-4 w-4" />
-            <span>/</span>
-            <span>Administration</span>
-            <span>/</span>
-            <span className="text-gray-900 font-medium">Dashboard</span>
-          </div>
-        </div>
         {/* Main Content Area */}
         <main className="flex-1 p-2 md:p-6 max-w-7xl mx-auto w-full">
           {/* Dashboard Tab */}
