@@ -890,6 +890,9 @@ export const SubjectManagement: React.FC = () => {
                   SEMESTER
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  STATUS
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   SCHEDULE
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -926,14 +929,25 @@ export const SubjectManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(subject.isScheduled)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     {subject.isScheduled ? (
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {new Date(
-                            subject.scheduledDate!
-                          ).toLocaleDateString()}
-                        </span>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-900">
+                            {new Date(
+                              subject.scheduledDate!
+                            ).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        {subject.assignedBy && (
+                          <div className="text-xs text-gray-500">
+                            Assigned by: {subject.assignedBy}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center space-x-2 text-gray-400">

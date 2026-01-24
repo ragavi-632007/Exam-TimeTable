@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Download, Calendar, ChevronLeft } from "lucide-react";
+import { Download, Calendar } from "lucide-react";
 import jsPDF from "jspdf";
 
 import { examService } from "../services/examService";
 import { departmentService } from "../services/departmentService";
 import { useExams } from "../context/ExamContext";
-import { ExamTimetablePreview } from "./ExamTimetablePreview";
 
 // Define departments for PDF generation (fallback if API fails)
 const defaultDepartments = [
@@ -39,8 +38,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   // selectedAlert,
 }) => {
   const [generating, setGenerating] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState("2");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
   const [selectedExam, setSelectedExam] = useState("IA1");
   const [refId1, setRefId1] = useState("");
@@ -49,7 +47,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   const [departments, setDepartments] = useState(defaultDepartments);
   const [loading, setLoading] = useState(true);
-  const { alerts, exams } = useExams();
+  const { alerts } = useExams();
 
   // Compute dynamic REF from the latest matching alert (by alertDate or createdAt)
   const dynamicRefId = useMemo(() => {
@@ -105,44 +103,6 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
     }
   }, [matchedAlert]);
 
-  // Get year label
-  const getYearLabel = (year: number): string => {
-    const labels: Record<number, string> = {
-      1: '1ST', 2: '2ND', 3: '3RD', 4: '4TH',
-    };
-    return labels[year] || `${year}`;
-  };
-
-  // Get exam type label
-  const getExamTypeLabel = (examType?: string): string => {
-    const labelMap: Record<string, string> = {
-      'Internal Assessment-I': 'IA 1',
-      'Internal Assessment-II': 'IA 2',
-      'Model Exam': 'MODEL',
-      'IA1': 'IA 1',
-      'IA2': 'IA 2',
-      'MODEL': 'MODEL',
-    };
-    return labelMap[examType || ''] || examType || 'Unknown';
-  };
-
-  // Get semester label
-  const getSemesterLabel = (sem: number): string => {
-    const labels: Record<number, string> = {
-      1: 'SEM 1', 2: 'SEM 2', 3: 'SEM 3', 4: 'SEM 4',
-      5: 'SEM 5', 6: 'SEM 6', 7: 'SEM 7', 8: 'SEM 8',
-    };
-    return labels[sem] || `SEM ${sem}`;
-  };
-
-  // Generate user-friendly alert title
-  const getAlertTitle = (alert: any): string => {
-    const year = getYearLabel(alert.year);
-    const sem = getSemesterLabel(alert.semester);
-    const examType = getExamTypeLabel(alert.examType);
-    return `${year} YEAR ${sem} ${examType}`;
-  };
-
   // Compute dynamic Start Date from alerts (fallback when no scheduled exams yet)
   const dynamicStartDate = useMemo(() => {
     if (!alerts || alerts.length === 0) return null;
@@ -171,13 +131,13 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   // Reset semester if it becomes invalid for the selected year
   useEffect(() => {
     const allowed =
-      selectedYear === 1
+      selectedYear === "1"
         ? ["1", "2"]
-        : selectedYear === 2
+        : selectedYear === "2"
         ? ["3", "4"]
-        : selectedYear === 3
+        : selectedYear === "3"
         ? ["5", "6"]
-        : selectedYear === 4
+        : selectedYear === "4"
         ? ["7", "8"]
         : [];
     if (selectedSemester && !allowed.includes(selectedSemester)) {
@@ -195,7 +155,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       const dateRaw = (exam.scheduledDate || exam.examDate) as string | undefined;
       if (!dateRaw || !exam.department) return;
       const examYear = Number(exam.year ?? exam.subject_detail?.year);
-      if (examYear !== selectedYear) return;
+      if (String(examYear) !== selectedYear) return;
       if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
       const date = new Date(dateRaw).toLocaleDateString("en-GB");
       if (!map.has(date)) map.set(date, {});
@@ -262,16 +222,6 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
 
     loadData();
   }, []);
-
-  // Sync semester when alert is selected
-  useEffect(() => {
-    if (selectedAlertId) {
-      const selectedAlert = alerts.find((a) => a.id === selectedAlertId);
-      if (selectedAlert && selectedAlert.semester) {
-        setSelectedSemester(String(selectedAlert.semester));
-      }
-    }
-  }, [selectedAlertId, alerts]);
 
   const generatePDF = async () => {
     setGenerating(true);
@@ -351,7 +301,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       scheduledExams
         .filter((exam) => {
           const examYear = Number(exam.year ?? exam.subject_detail?.year);
-          const matchesYear = examYear === selectedYear;
+          const matchesYear = String(examYear) === selectedYear;
           const hasDate = Boolean(exam.scheduledDate || exam.examDate);
           const matchesSem = selectedSemester ? String(exam.semester ?? exam.sem ?? "") === selectedSemester : true;
           return matchesYear && matchesSem && hasDate;
@@ -422,7 +372,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         if (!dateRaw || !exam.department) return;
         // Filter by selected year
         const examYear = Number(exam.year ?? exam.subject_detail?.year);
-        if (examYear !== selectedYear) return;
+        if (String(examYear) !== selectedYear) return;
         if (selectedSemester && String(exam.semester ?? exam.sem ?? "") !== selectedSemester) return;
         const date = new Date(dateRaw).toLocaleDateString("en-GB");
         if (!scheduleMap.has(date)) scheduleMap.set(date, {});
@@ -556,203 +506,198 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Year Selection for Timetable Preview */}
-              {selectedAlertId === null && (
-                <>
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">
-                      Select Year to View Timetable Preview
-                    </h4>
-                    <div className="flex flex-wrap gap-3 mb-6">
-                      {[1, 2, 3, 4].map((year) => (
-                        <button
-                          key={year}
-                          onClick={() => {
-                            setSelectedYear(year as 1 | 2 | 3 | 4);
-                            setSelectedAlertId(null);
-                          }}
-                          className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                            selectedYear === year
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                          }`}
-                        >
-                          {year}
-                          {year === 1 ? "st" : year === 2 ? "nd" : year === 3 ? "rd" : "th"} Year
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Alert Selection */}
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
-                        Select an Alert for Timetable
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {alerts
-                          .filter((alert) => alert.year === selectedYear)
-                          .map((alert) => (
-                            <button
-                              key={alert.id}
-                              onClick={() => setSelectedAlertId(alert.id)}
-                              className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
-                            >
-                              <div className="font-semibold text-gray-900">
-                                {getAlertTitle(alert)}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-2">
-                                {alert.startDate ? new Date(alert.startDate).toLocaleDateString() : "N/A"} -{" "}
-                                {alert.endDate ? new Date(alert.endDate).toLocaleDateString() : "N/A"}
-                              </div>
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Timetable Preview for selected alert */}
-              {selectedAlertId && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <button
-                    onClick={() => setSelectedAlertId(null)}
-                    className="mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors flex items-center space-x-2"
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Year
+                  </label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span>Back to Alerts</span>
-                  </button>
+                    <option value="1">I Year</option>
+                    <option value="2">II Year</option>
+                    <option value="3">III Year</option>
+                    <option value="4">IV Year</option>
+                  </select>
+                </div>
 
-                  {/* PDF Generation Controls */}
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        Generate PDF
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Reference ID
-                          </label>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-600">CIT/COE/</span>
-                            <input
-                              type="text"
-                              maxLength={4}
-                              value={refId1}
-                              onChange={(e) => setRefId1(e.target.value.toUpperCase())}
-                              placeholder="____"
-                              className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
-                            />
-                            <span className="text-gray-600">/</span>
-                            <input
-                              type="text"
-                              maxLength={4}
-                              value={refId2}
-                              onChange={(e) => setRefId2(e.target.value.toUpperCase())}
-                              placeholder="____"
-                              className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
-                            />
-                            <span className="text-gray-600">/</span>
-                            <input
-                              type="text"
-                              maxLength={4}
-                              value={refId3}
-                              onChange={(e) => setRefId3(e.target.value.toUpperCase())}
-                              placeholder="____"
-                              className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Semester
+                  </label>
+                  <select
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Semesters</option>
+                    {selectedYear === "1" && (
+                      <>
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                      </>
+                    )}
+                    {selectedYear === "2" && (
+                      <>
+                        <option value="3">Semester 3</option>
+                        <option value="4">Semester 4</option>
+                      </>
+                    )}
+                    {selectedYear === "3" && (
+                      <>
+                        <option value="5">Semester 5</option>
+                        <option value="6">Semester 6</option>
+                      </>
+                    )}
+                    {selectedYear === "4" && (
+                      <>
+                        <option value="7">Semester 7</option>
+                        <option value="8">Semester 8</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Examination Type
+                  </label>
+                  <select
+                    value={selectedExam}
+                    onChange={(e) => setSelectedExam(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="IA1">IA1 - Internal Assessment I</option>
+                    <option value="IA2">IA2 - Internal Assessment II</option>
+                    <option value="MODEL">MODEL - Model Examination</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reference ID
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-600">CIT/COE/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId1}
+                      onChange={(e) => setRefId1(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                    <span className="text-gray-600">/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId2}
+                      onChange={(e) => setRefId2(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                    <span className="text-gray-600">/</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={refId3}
+                      onChange={(e) => setRefId3(e.target.value.toUpperCase())}
+                      placeholder="____"
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Scheduled Exams Table Preview */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Calendar className="h-5 w-5 text-green-500 mr-2" />
+                      <h3 className="text-lg font-medium text-gray-900">
+                        Year {selectedYear} Exam Schedule
+                      </h3>
                     </div>
-
-                    {/* PDF Preview Table */}
-                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 border-b border-gray-200">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-5 w-5 text-green-500" />
-                          <h3 className="text-lg font-medium text-gray-900">
-                            Year {selectedYear} Exam Schedule
-                          </h3>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead className="bg-green-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">
-                                DATE
-                              </th>
-                              {departments.map((dept) => (
-                                <th
-                                  key={dept.code}
-                                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border"
-                                >
-                                  {dept.code}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white">
-                            {previewSortedDates.length === 0 ? (
-                              <tr>
-                                <td colSpan={departments.length + 1} className="px-4 py-8 text-center text-gray-500">
-                                  No exams scheduled yet
-                                </td>
-                              </tr>
-                            ) : (
-                              previewSortedDates.map((date) => (
-                                <tr key={date} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border">
-                                    {date}
-                                  </td>
-                                  {departments.map((dept) => {
-                                    const exam = previewScheduleMap.get(date)[dept.code];
-                                    return (
-                                      <td key={dept.code} className="px-4 py-3 text-sm text-center border">
-                                        {exam ? (
-                                          <div>
-                                            <div className="font-medium text-sm">{exam.subjectCode}</div>
-                                            <div className="text-xs text-gray-600 mt-1">{exam.subjectName}</div>
-                                          </div>
-                                        ) : (
-                                          <span className="text-gray-400">-</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <button
-                        onClick={generatePDF}
-                        disabled={generating}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {generating ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Generating PDF...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            <span>Download PDF</span>
-                          </>
-                        )}
-                      </button>
+                    <div className="text-sm text-gray-500">
+                      {previewSortedDates[0] || dynamicStartDate || ""}
                     </div>
                   </div>
                 </div>
-              )}
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-green-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">
+                          DATE
+                        </th>
+                        {departments.map((dept) => (
+                          <th
+                            key={dept.code}
+                            className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border"
+                          >
+                            {dept.code}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {previewSortedDates.length === 0 ? (
+                        <tr>
+                          <td colSpan={departments.length + 1} className="px-4 py-8 text-center text-gray-500">
+                            No exams scheduled yet
+                          </td>
+                        </tr>
+                      ) : (
+                        previewSortedDates.map((date) => (
+                          <tr key={date} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border">
+                              {date}
+                            </td>
+                            {departments.map((dept) => {
+                              const exam = previewScheduleMap.get(date)[dept.code];
+                              return (
+                                <td key={dept.code} className="px-4 py-3 text-sm text-center border">
+                                  {exam ? (
+                                    <div>
+                                      <div className="font-medium text-sm">{exam.subjectCode}</div>
+                                      <div className="text-xs text-gray-600 mt-1">{exam.subjectName}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={generatePDF}
+                  disabled={generating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      <span>Download PDF</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>
