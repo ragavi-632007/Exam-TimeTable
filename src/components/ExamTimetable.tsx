@@ -215,12 +215,12 @@ export const ExamTimetable: React.FC = () => {
         {/* Timetable */}
         <div className="mb-8">
           <div className="overflow-x-auto">
-            <table className="min-w-full border-2 border-gray-400">
+            <table className="min-w-full border-2 border-gray-400 table-fixed">
               <thead>
                 <tr className="bg-gray-200">
-                  <th className="border-2 border-gray-400 px-3 py-2 text-sm font-bold text-gray-900 text-center">DATE</th>
+                  <th className="border-2 border-gray-400 px-4 py-3 text-sm font-bold text-gray-900 text-center w-28">DATE</th>
                   {allDepartments.map(dept => (
-                    <th key={dept} className="border-2 border-gray-400 px-3 py-2 text-sm font-bold text-gray-900 text-center">
+                    <th key={dept} className="border-2 border-gray-400 px-4 py-3 text-sm font-bold text-gray-900 text-center w-40">
                       {departmentCodes[dept] || dept}
                     </th>
                   ))}
@@ -229,17 +229,17 @@ export const ExamTimetable: React.FC = () => {
               <tbody>
                 {dates.map(date => (
                   <tr key={date} className="hover:bg-gray-50">
-                    <td className="border-2 border-gray-400 px-3 py-2 text-sm font-bold text-gray-900 text-center">
+                    <td className="border-2 border-gray-400 px-4 py-3 text-sm font-bold text-gray-900 text-center w-28">
                       {formatDate(date)}
                     </td>
                     {allDepartments.map(dept => {
                       const schedule = schedulesByDate[date]?.find(s => s.department === dept);
                       return (
-                        <td key={dept} className="border-2 border-gray-400 px-3 py-2 text-sm text-gray-700 text-center">
+                        <td key={dept} className="border-2 border-gray-400 px-4 py-3 text-sm text-gray-700 text-center w-40">
                           {schedule ? (
-                            <div>
-                              <div className="font-bold text-base">{schedule.subjectCode}</div>
-                              <div className="text-xs text-gray-600 mt-1">{schedule.subjectName}</div>
+                            <div className="space-y-1">
+                              <div className="font-bold text-sm">{schedule.subjectCode}</div>
+                              <div className="text-xs text-gray-600">{schedule.subjectName}</div>
                             </div>
                           ) : (
                             <span className="text-gray-400">-</span>
@@ -317,10 +317,23 @@ export const ExamTimetable: React.FC = () => {
           table { 
             page-break-inside: avoid;
             border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
           }
           th, td { 
             border: 2px solid #666 !important;
-            padding: 8px !important;
+            padding: 10px 6px !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
+          }
+          th:first-child, td:first-child {
+            width: 90px !important;
+            min-width: 90px !important;
+          }
+          th:not(:first-child), td:not(:first-child) {
+            width: 70px !important;
+            min-width: 70px !important;
           }
           .bg-gray-200 { 
             background-color: #e5e7eb !important;
@@ -330,6 +343,17 @@ export const ExamTimetable: React.FC = () => {
           }
           .font-bold { 
             font-weight: bold !important;
+          }
+          .text-xs {
+            font-size: 8px !important;
+            line-height: 1.1 !important;
+          }
+          .text-sm {
+            font-size: 10px !important;
+            line-height: 1.2 !important;
+          }
+          .space-y-1 > * + * {
+            margin-top: 2px !important;
           }
         }
       `}</style>

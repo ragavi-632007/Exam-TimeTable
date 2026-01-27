@@ -435,9 +435,9 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Dynamic department codes for headers (sorted by code)
       const deptHeaders = departments.map((d) => d.code);
       // Use department names for table headers
-      const colHeaders = ["DATE", ...departments.map((d) => d.name)];
+      const colHeaders = ["DATE", ...departments.map((d) => d.code)];
       // Calculate column widths (date column + equal width for each department)
-      const dateColWidth = 28;
+      const dateColWidth = 22;
       const deptColWidth = (tableWidth - dateColWidth) / deptHeaders.length;
       const colWidths = [
         dateColWidth,
@@ -451,9 +451,9 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       for (let i = 0; i < colHeaders.length; i++) {
         pdf.setDrawColor(0, 0, 0);
         pdf.setFillColor(220, 220, 220);
-        pdf.rect(colX, tableY, colWidths[i], 10, "F");
+        pdf.rect(colX, tableY, colWidths[i], 14, "F");
         pdf.setTextColor(0, 0, 0);
-        pdf.text(colHeaders[i], colX + 2, tableY + 7, {
+        pdf.text(colHeaders[i], colX + 2, tableY + 10, {
           maxWidth: colWidths[i] - 4,
         });
         colX += colWidths[i];
@@ -497,7 +497,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       });
 
       // Table rows
-      let rowY = tableY + 10;
+      let rowY = tableY + 14;
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
       // Find all common subject names for each date (appearing in more than one department)
@@ -519,32 +519,73 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       }
       for (const date of sortedDates) {
         colX = tableX;
-        pdf.rect(colX, rowY, colWidths[0], 10);
-        pdf.text(date, colX + 2, rowY + 7);
-        colX += colWidths[0];
+        
+        // Calculate the row height based on content
+        let maxRowHeight = 12; // minimum height
+        
+        // Check date column
+        const dateLines = pdf.splitTextToSize(date, colWidths[0] - 4);
+        const dateHeight = dateLines.length * 4;
+        maxRowHeight = Math.max(maxRowHeight, dateHeight + 4);
+        
+        // Check all department columns
         for (let d = 0; d < deptHeaders.length; d++) {
           const dept = deptHeaders[d];
-          pdf.rect(colX, rowY, colWidths[d + 1], 10);
           const exam = scheduleMap.get(date)[dept];
           if (exam) {
             const code = exam.subjectCode || "-";
             const name = exam.subjectName || "-";
-            // If this subject name is common for this date, make it bold
+            const codeLines = pdf.splitTextToSize(code, colWidths[d + 1] - 4);
+            const nameLines = pdf.splitTextToSize(name, colWidths[d + 1] - 4);
+            const cellHeight = (codeLines.length + nameLines.length) * 4 + 2;
+            maxRowHeight = Math.max(maxRowHeight, cellHeight + 2);
+          }
+        }
+        
+        // Draw cells with calculated height
+        colX = tableX;
+        pdf.rect(colX, rowY, colWidths[0], maxRowHeight);
+        const dateLines2 = pdf.splitTextToSize(date, colWidths[0] - 4);
+        let textY = rowY + 3;
+        dateLines2.forEach((line: string) => {
+          pdf.text(line, colX + 2, textY);
+          textY += 4;
+        });
+        colX += colWidths[0];
+        
+        for (let d = 0; d < deptHeaders.length; d++) {
+          const dept = deptHeaders[d];
+          pdf.rect(colX, rowY, colWidths[d + 1], maxRowHeight);
+          const exam = scheduleMap.get(date)[dept];
+          if (exam) {
+            const code = exam.subjectCode || "-";
+            const name = exam.subjectName || "-";
+            
             if (commonSubjectsByDate[date].has(name)) {
               pdf.setFont("helvetica", "bold");
-              pdf.text(code, colX + 2, rowY + 4);
-              pdf.text(name, colX + 2, rowY + 8);
-              pdf.setFont("helvetica", "normal");
-            } else {
-              pdf.text(code, colX + 2, rowY + 4);
-              pdf.text(name, colX + 2, rowY + 8);
             }
+            
+            const codeLines = pdf.splitTextToSize(code, colWidths[d + 1] - 4);
+            let cellTextY = rowY + 3;
+            codeLines.forEach((line: string) => {
+              pdf.text(line, colX + 2, cellTextY);
+              cellTextY += 4;
+            });
+            
+            const nameLines = pdf.splitTextToSize(name, colWidths[d + 1] - 4);
+            nameLines.forEach((line: string) => {
+              pdf.text(line, colX + 2, cellTextY);
+              cellTextY += 4;
+            });
+            
+            pdf.setFont("helvetica", "normal");
           } else {
-            pdf.text("-", colX + 2, rowY + 7);
+            const emptyY = rowY + maxRowHeight / 2;
+            pdf.text("-", colX + 2, emptyY);
           }
           colX += colWidths[d + 1];
         }
-        rowY += 10;
+        rowY += maxRowHeight;
       }
 
       // Notes
