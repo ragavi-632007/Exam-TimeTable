@@ -43,7 +43,7 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
     }
 
     try {
-      // Update the exam schedule (swap logic handled in service)
+      // Update the exam schedule (swap logic and cross-department consistency handled in service)
       await examService.updateExamSchedule(schedule.id, {
         exam_date: formData.examDate,
         exam_type: formData.examType,
@@ -54,13 +54,10 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
       onUpdate();
       onClose();
     } catch (error: any) {
-      // If swap occurred, show a message
-      if (error.message && error.message.includes('swap')) {
-        setError('Exam date was swapped with another subject scheduled on the same date.');
-      } else {
-        setError(error.message || 'Failed to update exam schedule');
-      }
+      // Show comprehensive error message
+      const errorMsg = error.message || 'Failed to update exam schedule';
       console.error('Failed to update exam schedule:', error);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -104,6 +101,17 @@ export const EditExamSchedule: React.FC<EditExamScheduleProps> = ({ schedule, on
               <p>Subject Code: {schedule.subjectCode}</p>
               <p>Department: {schedule.department}</p>
               <p>Current Date: {new Date(schedule.examDate).toLocaleDateString()}</p>
+            </div>
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              <p className="font-semibold mb-1">📋 Important Note:</p>
+              <p>
+                If this subject is taught in multiple departments, changing the date will:
+              </p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5">
+                <li>Automatically update the date for this subject in ALL departments</li>
+                <li>Release (remove) any conflicting schedules on the old date</li>
+                <li>Ensure all departments teaching this subject have the exam on the same date</li>
+              </ul>
             </div>
           </div>
 

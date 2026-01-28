@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Download, Calendar, ChevronLeft } from "lucide-react";
+import { Download, Calendar, ChevronLeft, Edit } from "lucide-react";
 import jsPDF from "jspdf";
 
 import { examService } from "../services/examService";
 import { departmentService } from "../services/departmentService";
 import { useExams } from "../context/ExamContext";
+import { useAuth } from "../context/AuthContext";
 import { ExamTimetablePreview } from "./ExamTimetablePreview";
+import { EditExamSchedule } from "./EditExamSchedule";
 
 // Define departments for PDF generation (fallback if API fails)
 const defaultDepartments = [
@@ -38,6 +40,7 @@ interface PDFGeneratorProps {
 export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   // selectedAlert,
 }) => {
+  const { user } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [selectedYear, setSelectedYear] = useState<1 | 2 | 3 | 4>(1);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
   const [refId3, setRefId3] = useState("");
   const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   const [departments, setDepartments] = useState(defaultDepartments);
+  const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const { alerts, exams } = useExams();
 
@@ -808,10 +812,19 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                                   </td>
                                   {departments.map((dept) => {
                                     const exam = previewScheduleMap.get(date)[dept.code];
+                                    const canEdit = user && (user.role === 'admin' || (user.role === 'teacher' && user.department === dept.code));
                                     return (
                                       <td key={dept.code} className="px-4 py-3 text-sm text-center border">
                                         {exam ? (
-                                          <div>
+                                          <div 
+                                            className={`p-2 rounded transition-all ${
+                                              canEdit 
+                                                ? 'cursor-pointer hover:bg-blue-100 hover:shadow-md' 
+                                                : ''
+                                            }`}
+                                            onClick={() => canEdit && setEditingSchedule(exam)}
+                                            title={canEdit ? 'Click to edit exam schedule' : 'No edit permission'}
+                                          >
                                             <div className="font-medium text-sm">{exam.subjectCode}</div>
                                             <div className="text-xs text-gray-600 mt-1">{exam.subjectName}</div>
                                           </div>
@@ -828,6 +841,17 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
                         </table>
                       </div>
                     </div>
+
+                    {editingSchedule && (
+                      <EditExamSchedule
+                        schedule={editingSchedule}
+                        onClose={() => setEditingSchedule(null)}
+                        onUpdate={() => {
+                          setEditingSchedule(null);
+                          examService.getScheduledExams().then(setScheduledExams).catch(console.error);
+                        }}
+                      />
+                    )}
 
                     <div className="flex justify-end">
                       <button

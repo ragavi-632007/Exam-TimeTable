@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Calendar } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, Calendar, Edit } from 'lucide-react';
 import { ExamAlert } from '../types';
 import DatePicker from 'react-datepicker';
 import { format } from 'date-fns';
 import { useExams } from '../context/ExamContext';
+import { EditExamSchedule } from './EditExamSchedule';
+import { useAuth } from '../context/AuthContext';
 
 interface AlertScheduleCardProps {
   alert: ExamAlert;
@@ -20,11 +22,13 @@ export const AlertScheduleCard: React.FC<AlertScheduleCardProps> = ({
   userDepartment,
   onScheduleExam,
 }) => {
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
   const [schedulingLoading, setSchedulingLoading] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
 
   // Get year label
   const getYearLabel = (year: number): string => {
@@ -416,32 +420,57 @@ export const AlertScheduleCard: React.FC<AlertScheduleCardProps> = ({
             <div className="border-t border-gray-200 pt-4">
               <h4 className="font-medium text-gray-900 mb-3">Scheduled Exams</h4>
               <div className="space-y-3">
-                {scheduledExamsForAlert.map((exam) => (
-                  <div
-                    key={exam.id}
-                    className="bg-white rounded-lg p-3 border border-green-200"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h5 className="font-medium text-gray-900">
-                          {exam.subjectName}
-                        </h5>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Code: {exam.subjectCode}
-                        </p>
-                        <p className="text-xs font-medium text-green-600 mt-2">
-                          Scheduled for: {exam.scheduledDate}
-                        </p>
+                {scheduledExamsForAlert.map((exam) => {
+                  const canEdit = user && (user.role === 'admin' || (user.role === 'teacher' && user.department === exam.department));
+                  return (
+                    <div
+                      key={exam.id}
+                      className="bg-white rounded-lg p-3 border border-green-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h5 className="font-medium text-gray-900">
+                            {exam.subjectName}
+                          </h5>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Code: {exam.subjectCode}
+                          </p>
+                          <p className="text-xs font-medium text-green-600 mt-2">
+                            Scheduled for: {exam.scheduledDate}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {canEdit && (
+                            <button
+                              onClick={() => setEditingSchedule(exam)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                              title="Edit Schedule"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+                          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap">
+                            Confirmed
+                          </span>
+                        </div>
                       </div>
-                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap">
-                        Confirmed
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
+
+        {editingSchedule && (
+          <EditExamSchedule
+            schedule={editingSchedule}
+            onClose={() => setEditingSchedule(null)}
+            onUpdate={() => {
+              setEditingSchedule(null);
+              // Re-fetch or refresh is handled by parent component
+            }}
+          />
+        )}
         </div>
       )}
     </div>
