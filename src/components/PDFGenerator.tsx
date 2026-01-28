@@ -255,7 +255,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
             !exam.department ||
             !exam.examDate
           ) {
-            console.log("Warning: Exam missing required fields:", exam);
+            console.log("Warning: Exam missing required fields :", exam);
           }
         });
 
@@ -503,7 +503,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Table rows
       let rowY = tableY + 14;
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
+      pdf.setFontSize(8);
       // Find all common subject names for each date (appearing in more than one department)
       const commonSubjectsByDate: Record<string, Set<string>> = {};
       for (const date of sortedDates) {
