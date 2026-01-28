@@ -882,12 +882,15 @@ export const examService = {
       // Get current exam's department to check for conflicts within same department
       const { data: currentExam, error: currentError } = await supabase
         .from("exam_schedules")
-        .select("exam_date, department_id")
+        .select("id, exam_date, department_id")
         .eq("id", scheduleId)
-        .single();
+        .maybeSingle();
 
       if (currentError) {
         throw new Error(currentError.message);
+      }
+      if (!currentExam) {
+        throw new Error("Exam schedule not found for the given ID.");
       }
 
       // Check for conflicts on the new date within the same department
@@ -918,6 +921,7 @@ export const examService = {
       }
     }
 
+    // Always update the target schedule
     const { error } = await supabase
       .from("exam_schedules")
       .update(updateData)

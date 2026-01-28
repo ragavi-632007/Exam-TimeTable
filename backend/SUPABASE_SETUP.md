@@ -1,3 +1,0 @@
-# Supabase Setup
-
-...existing code...

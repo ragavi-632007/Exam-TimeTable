@@ -352,31 +352,31 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         // If logo fails, skip
       }
       // Header layout: logo (left), college name (right, same line), then details below
-      const headerY = y + 1;
+      const headerY = y -1;
       if (logoBase64) {
         // Increase logo size and align with text
-        pdf.addImage(typeof logoBase64 === 'string' ? logoBase64 : String(logoBase64), 'JPEG', 18, headerY - 2, 50, 28);
+        pdf.addImage(typeof logoBase64 === 'string' ? logoBase64 : String(logoBase64), 'JPEG', 18, headerY - 12, 50, 28);
       }
       pdf.setFontSize(22);
       pdf.setFont("helvetica", "bold");
       // Center align college name
-      pdf.text("CHENNAI INSTITUTE OF TECHNOLOGY", pageWidth / 2, headerY + 8, { align: "center" });
+      pdf.text("CHENNAI INSTITUTE OF TECHNOLOGY", pageWidth / 2, headerY , { align: "center" });
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text("(Autonomous Institution, Affiliated to Anna University, Chennai)", pageWidth / 2, headerY + 20, { align: "center" });
+      pdf.text("(Autonomous Institution, Affiliated to Anna University, Chennai)", pageWidth / 2, headerY + 8, { align: "center" });
       pdf.setFontSize(11);
-      pdf.text("OFFICE OF THE CONTROLLER OF EXAMINATIONS", pageWidth / 2, headerY + 30, { align: "center" });
+      pdf.text("OFFICE OF THE CONTROLLER OF EXAMINATIONS", pageWidth / 2, headerY + 18, { align: "center" });
       // Reference and Date
       pdf.setFontSize(10);
       const customRefId = `CIT/COE/${refId1 || '____'}/${refId2 || '____'}/${refId3 || '____'}`;
       const refText = `REF: ${customRefId}`;
-      pdf.text(refText, 18, headerY + 40);
-      pdf.text(`DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - 50, headerY + 40);
+      pdf.text(refText, 18, headerY + 32);
+      pdf.text(`DATE: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - 50, headerY + 28);
       // Circular title
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("CIRCULAR", pageWidth / 2, headerY + 45, { align: "center" });
-      y = headerY + 50;
+      pdf.text("CIRCULAR", pageWidth / 2, headerY + 33, { align: "center" });
+      y = headerY + 36;
 
       // --- Circular content (dynamic, similar to preview page) ---
       pdf.setFontSize(11);
@@ -429,7 +429,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Calculate dynamic Y position after circular text
       const lineHeight = 5;
       const circularTextHeight = lines.length * lineHeight;
-      const tableY = y + 8 + circularTextHeight + 10;
+      const tableY = y + 8 + circularTextHeight;
       const tableX = 12;
       const tableWidth = pageWidth - 24;
       // Dynamic department codes for headers (sorted by code)
@@ -444,7 +444,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
         ...Array(deptHeaders.length).fill(deptColWidth),
       ];
       let colX = tableX;
-      pdf.setFontSize(9);
+      pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
       pdf.setFillColor(220, 220, 220);
       // Header row
@@ -499,7 +499,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       // Table rows
       let rowY = tableY + 14;
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8);
+      pdf.setFontSize(9);
       // Find all common subject names for each date (appearing in more than one department)
       const commonSubjectsByDate: Record<string, Set<string>> = {};
       for (const date of sortedDates) {
