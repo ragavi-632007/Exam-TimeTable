@@ -967,23 +967,12 @@ export const examService = {
       // Get current exam's full details including subject info
       const { data: currentExam, error: currentError } = await supabase
         .from("exam_schedules")
-<<<<<<< HEAD
-        .select("id, exam_date, department_id")
-=======
-        .select(`
-          *,
-          subject_detail(*),
-          departments!exam_schedules_department_id_fkey(*)
-        `)
->>>>>>> 00345e2ed98541651fcdd139227274dc280a86fb
+        .select("exam_date, department_id")
         .eq("id", scheduleId)
         .maybeSingle();
 
       if (currentError) {
         throw new Error(currentError.message);
-      }
-      if (!currentExam) {
-        throw new Error("Exam schedule not found for the given ID.");
       }
 
       if (!currentExam || !currentExam.subject_detail) {
