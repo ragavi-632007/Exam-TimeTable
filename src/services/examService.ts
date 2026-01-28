@@ -387,7 +387,7 @@ export const examService = {
         );
       }
 
-      // Check for shared subject conflicts BEFORE creating/finding the subject
+      // Check for shared subject conflicts BEFORE creating/finding the subject (by name OR code)
       const { data: existingSchedules, error: scheduleCheckError } =
         await supabase.from("exam_schedules").select(`
           *,
@@ -399,11 +399,31 @@ export const examService = {
         throw new Error(scheduleCheckError.message);
       }
 
-      // Check if the same subject name is already scheduled
+      // Check if the same subject (by name OR code) is already scheduled
+      const isCN = ((staffData.subject_name || "").toLowerCase().includes("cn") ||
+                     (staffData.subject_code || "").toLowerCase().includes("cn"));
+
       const sameSubjectSchedules =
-        existingSchedules?.filter(
-          (schedule) => schedule.subject_detail?.name === staffData.subject_name
-        ) || [];
+        existingSchedules?.filter((schedule) => {
+          if (!schedule.subject_detail) return false;
+          const name = (schedule.subject_detail.name || "").toLowerCase();
+          const code = (schedule.subject_detail.subcode || "").toLowerCase();
+
+          // Exact match by name or code
+          if (
+            schedule.subject_detail.name === staffData.subject_name ||
+            schedule.subject_detail.subcode === staffData.subject_code
+          ) {
+            return true;
+          }
+
+          // Special case: any subject containing "cn" should be treated as the same subject
+          if (isCN && (name.includes("cn") || code.includes("cn"))) {
+            return true;
+          }
+
+          return false;
+        }) || [];
 
       if (sameSubjectSchedules.length > 0) {
         // If the subject is already scheduled, force it to be on the same date
@@ -412,9 +432,9 @@ export const examService = {
           const scheduledDept =
             existingSchedule.departments?.name || "Unknown Department";
           throw new Error(
-            `Subject "${staffData.subject_name}" must be scheduled on ${existingSchedule.exam_date} ` +
+            `Subject "${staffData.subject_name}" (Code: ${staffData.subject_code}) must be scheduled on ${existingSchedule.exam_date} ` +
               `as it is already scheduled by ${scheduledDept} department. ` +
-              `All departments teaching "${staffData.subject_name}" must have the exam on the same date.`
+              `All departments teaching this subject must have the exam on the same date.`
           );
         }
       }
@@ -477,13 +497,29 @@ export const examService = {
         throw new Error(`Department not found: ${trimmedDepartment}`);
       }
 
-      // Find other departments teaching the same subject (by code AND name)
-      const { data: otherDeptSubjects, error: otherDeptError } = await supabase
-        .from("subject_detail")
-        .select("*")
-        .eq("subcode", staffData.subject_code)
-        .eq("name", staffData.subject_name)
-        .neq("department", staffData.department);
+      // Find other departments teaching the same subject. Match by name OR code.
+      let otherDeptSubjects: any = [];
+      let otherDeptError: any = null;
+
+      if (isCN) {
+        const cnPattern = "%cn%"; // case-insensitive match
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.ilike.${cnPattern},subcode.ilike.${cnPattern}`)
+          .neq("department", staffData.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      } else {
+        // Match by name OR code (not necessarily both)
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.eq.${staffData.subject_name},subcode.eq.${staffData.subject_code}`)
+          .neq("department", staffData.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      }
 
       // Get department IDs for the other departments
       const departmentIds: { [dept: string]: string } = {};
@@ -617,7 +653,7 @@ export const examService = {
 
       const subject = subjects[0];
 
-      // Check for shared subject conflicts for regular subjects
+      // Check for shared subject conflicts for regular subjects (by name OR code)
       const { data: existingSchedules, error: scheduleCheckError } =
         await supabase.from("exam_schedules").select(`
           *,
@@ -629,11 +665,31 @@ export const examService = {
         throw new Error(scheduleCheckError.message);
       }
 
-      // Check if the same subject name is already scheduled
+      // Check if the same subject (by name OR code) is already scheduled in another department
+      const isCN = ((subject.name || "").toLowerCase().includes("cn") ||
+                     (subject.subcode || "").toLowerCase().includes("cn"));
+
       const sameSubjectSchedules =
-        existingSchedules?.filter(
-          (schedule) => schedule.subject_detail?.name === subject.name
-        ) || [];
+        existingSchedules?.filter((schedule) => {
+          if (!schedule.subject_detail) return false;
+          const name = (schedule.subject_detail.name || "").toLowerCase();
+          const code = (schedule.subject_detail.subcode || "").toLowerCase();
+
+          // Exact match by name or code
+          if (
+            schedule.subject_detail.name === subject.name ||
+            schedule.subject_detail.subcode === subject.subcode
+          ) {
+            return true;
+          }
+
+          // Special case: any subject containing "cn" should be treated as the same subject
+          if (isCN && (name.includes("cn") || code.includes("cn"))) {
+            return true;
+          }
+
+          return false;
+        }) || [];
 
       if (sameSubjectSchedules.length > 0) {
         // If the subject is already scheduled, force it to be on the same date
@@ -642,21 +698,38 @@ export const examService = {
           const scheduledDept =
             existingSchedule.departments?.name || "Unknown Department";
           throw new Error(
-            `Subject "${subject.name}" must be scheduled on ${existingSchedule.exam_date} ` +
+            `Subject "${subject.name}" (Code: ${subject.subcode}) must be scheduled on ${existingSchedule.exam_date} ` +
               `as it is already scheduled by ${scheduledDept} department. ` +
-              `All departments teaching "${subject.name}" must have the exam on the same date.`
+              `All departments teaching this subject must have the exam on the same date.`
           );
         }
       }
 
-      // Find other departments teaching the same subject (by code AND name)
-      const { data: otherDeptSubjects, error: otherDeptError } = await supabase
-        .from("subject_detail")
-        .select("*")
-        .eq("subcode", subject.subcode)
-        .eq("name", subject.name)
-        .eq("year", subject.year)
-        .neq("department", subject.department);
+      // Find other departments teaching the same subject (by name AND code). For CN subjects, match by substring (case-insensitive).
+      let otherDeptSubjects: any = [];
+      let otherDeptError: any = null;
+
+      if (isCN) {
+        const cnPattern = "%cn%";
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.ilike.${cnPattern},subcode.ilike.${cnPattern}`)
+          .eq("year", subject.year)
+          .neq("department", subject.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      } else {
+        // Match by name OR code (not necessarily both), same year
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.eq.${subject.name},subcode.eq.${subject.subcode}`)
+          .eq("year", subject.year)
+          .neq("department", subject.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      }
 
       if (otherDeptError) {
         throw new Error(otherDeptError.message);
@@ -869,7 +942,19 @@ export const examService = {
     };
   },
 
-  // Update exam schedule
+  // Delete exam schedule
+  async deleteExamSchedule(scheduleId: string): Promise<void> {
+    const { error } = await supabase
+      .from("exam_schedules")
+      .delete()
+      .eq("id", scheduleId);
+
+    if (error) {
+      throw new Error(`Failed to delete exam schedule: ${error.message}`);
+    }
+  },
+
+  // Update exam schedule with cross-department consistency and conflict resolution
   async updateExamSchedule(scheduleId: string, updates: any): Promise<void> {
     const updateData: any = {};
     if (updates.exam_date) updateData.exam_date = updates.exam_date;
@@ -879,10 +964,18 @@ export const examService = {
 
     // Check for conflict: is there another exam scheduled for the new date?
     if (updates.exam_date) {
-      // Get current exam's department to check for conflicts within same department
+      // Get current exam's full details including subject info
       const { data: currentExam, error: currentError } = await supabase
         .from("exam_schedules")
+<<<<<<< HEAD
         .select("id, exam_date, department_id")
+=======
+        .select(`
+          *,
+          subject_detail(*),
+          departments!exam_schedules_department_id_fkey(*)
+        `)
+>>>>>>> 00345e2ed98541651fcdd139227274dc280a86fb
         .eq("id", scheduleId)
         .maybeSingle();
 
@@ -893,10 +986,126 @@ export const examService = {
         throw new Error("Exam schedule not found for the given ID.");
       }
 
+      if (!currentExam || !currentExam.subject_detail) {
+        throw new Error("Exam or subject details not found");
+      }
+
+      const subject = currentExam.subject_detail;
+      const oldDate = currentExam.exam_date;
+
+      // Check if the same subject is scheduled elsewhere (by name OR code)
+      const { data: sameSubjectSchedules, error: sameSubjectError } = await supabase
+        .from("exam_schedules")
+        .select(`
+          *,
+          subject_detail(*),
+          departments!exam_schedules_department_id_fkey(*)
+        `)
+        .neq("id", scheduleId);
+
+      if (sameSubjectError) {
+        throw new Error(sameSubjectError.message);
+      }
+
+      // Find other departments with same subject (by name OR code)
+      const otherDeptSameSubject = sameSubjectSchedules?.filter(
+        (schedule) => 
+          schedule.subject_detail &&
+          (schedule.subject_detail.name === subject.name || 
+           schedule.subject_detail.subcode === subject.subcode) &&
+          schedule.subject_detail.id !== subject.id
+      ) || [];
+
+      // If same subject exists elsewhere, update them to the new date as well
+      if (otherDeptSameSubject.length > 0) {
+        for (const otherSchedule of otherDeptSameSubject) {
+          // Check for conflicts on the new date within this department
+          const { data: conflictExamsOtherDept, error: conflictErrorOtherDept } = await supabase
+            .from("exam_schedules")
+            .select(`
+              *,
+              subject_detail(*)
+            `)
+            .eq("exam_date", updates.exam_date)
+            .eq("department_id", otherSchedule.department_id)
+            .neq("id", otherSchedule.id);
+
+          if (conflictErrorOtherDept) {
+            console.error(`Failed to check conflicts for department ${otherSchedule.department_id}:`, conflictErrorOtherDept);
+          }
+
+          // If there's a conflict in this department, swap it to the old date
+          if (conflictExamsOtherDept && conflictExamsOtherDept.length > 0) {
+            const conflictExamOtherDept = conflictExamsOtherDept[0];
+            const conflictSubject = conflictExamOtherDept.subject_detail;
+
+            // First, update this conflicting exam to the old date
+            const { error: swapErrorOtherDept } = await supabase
+              .from("exam_schedules")
+              .update({ exam_date: oldDate })
+              .eq("id", conflictExamOtherDept.id);
+
+            if (swapErrorOtherDept) {
+              console.error(`Failed to swap conflict ${conflictExamOtherDept.id}:`, swapErrorOtherDept);
+            } else {
+              console.log(`Swapped conflict: ${conflictExamOtherDept.id} moved to ${oldDate}`);
+            }
+
+            // Check if the swapped subject is also a common subject (taught by other departments)
+            const { data: swappedSubjectOtherDepts, error: swappedError } = await supabase
+              .from("exam_schedules")
+              .select(`
+                *,
+                subject_detail(*)
+              `)
+              .neq("id", conflictExamOtherDept.id);
+
+            if (!swappedError && swappedSubjectOtherDepts) {
+              const otherDeptsWithSwappedSubject = swappedSubjectOtherDepts.filter(
+                (schedule) =>
+                  schedule.subject_detail &&
+                  (schedule.subject_detail.name === conflictSubject.name ||
+                   schedule.subject_detail.subcode === conflictSubject.subcode) &&
+                  schedule.subject_detail.id !== conflictSubject.id
+              );
+
+              // Update all other departments with the swapped subject to the old date as well
+              for (const swappedSchedule of otherDeptsWithSwappedSubject) {
+                const { error: updateSwappedError } = await supabase
+                  .from("exam_schedules")
+                  .update({ exam_date: oldDate })
+                  .eq("id", swappedSchedule.id);
+
+                if (updateSwappedError) {
+                  console.error(`Failed to update swapped subject ${swappedSchedule.id}:`, updateSwappedError);
+                } else {
+                  console.log(`Updated swapped subject ${swappedSchedule.id} for ${swappedSchedule.subject_detail.name} to date ${oldDate}`);
+                }
+              }
+            }
+          }
+
+          // Now update this department's schedule to the new date
+          const { error: updateOtherError } = await supabase
+            .from("exam_schedules")
+            .update({ exam_date: updates.exam_date })
+            .eq("id", otherSchedule.id);
+
+          if (updateOtherError) {
+            console.error(`Failed to update exam ${otherSchedule.id} to new date:`, updateOtherError);
+          } else {
+            console.log(`Updated exam ${otherSchedule.id} for ${otherSchedule.subject_detail.name} to date ${updates.exam_date}`);
+          }
+        }
+      }
+
       // Check for conflicts on the new date within the same department
       const { data: conflictExams, error: conflictError } = await supabase
         .from("exam_schedules")
-        .select("id, exam_date")
+        .select(`
+          *,
+          subject_detail(*)
+        `)
         .eq("exam_date", updates.exam_date)
         .eq("department_id", currentExam.department_id)
         .neq("id", scheduleId);
@@ -907,16 +1116,55 @@ export const examService = {
 
       if (conflictExams && conflictExams.length > 0) {
         // Found a conflict in the same department, perform the swap
-        const conflictExam = conflictExams[0]; // Take the first conflict if multiple exist
+        const conflictExam = conflictExams[0];
 
-        // Update the conflicting exam to take the current exam's date
+        // Update the conflicting exam to take the current exam's old date
         const { error: swapError } = await supabase
           .from("exam_schedules")
-          .update({ exam_date: currentExam.exam_date })
+          .update({ exam_date: oldDate })
           .eq("id", conflictExam.id);
 
         if (swapError) {
           throw new Error(swapError.message);
+        }
+
+        console.log(`Swapped exam schedules: ${scheduleId} -> ${updates.exam_date}, ${conflictExam.id} -> ${oldDate}`);
+      }
+
+      // If this subject is being moved to a different date, release (delete) schedules for the same subject on the old date in ALL departments
+      if (oldDate !== updates.exam_date) {
+        const { data: schedulesToRelease, error: releaseError } = await supabase
+          .from("exam_schedules")
+          .select(`
+            *,
+            subject_detail(*)
+          `)
+          .eq("exam_date", oldDate)
+          .neq("id", scheduleId);
+
+        if (releaseError) {
+          throw new Error(releaseError.message);
+        }
+
+        // Find and delete schedules for the same subject on the old date (other departments)
+        for (const scheduleToRelease of schedulesToRelease || []) {
+          if (
+            scheduleToRelease.subject_detail &&
+            (scheduleToRelease.subject_detail.name === subject.name ||
+             scheduleToRelease.subject_detail.subcode === subject.subcode) &&
+            scheduleToRelease.subject_detail.id !== subject.id
+          ) {
+            const { error: deleteError } = await supabase
+              .from("exam_schedules")
+              .delete()
+              .eq("id", scheduleToRelease.id);
+
+            if (deleteError) {
+              console.error(`Failed to release exam ${scheduleToRelease.id}:`, deleteError);
+            } else {
+              console.log(`Released exam schedule ${scheduleToRelease.id} for ${scheduleToRelease.subject_detail.name} in department ${scheduleToRelease.department_id}`);
+            }
+          }
         }
       }
     }

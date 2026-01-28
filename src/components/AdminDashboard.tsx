@@ -13,6 +13,7 @@ import {
   Home,
   LogOut,
   Edit,
+  Calendar,
 } from "lucide-react";
 import { CreateExamAlert } from "./CreateExamAlert";
 import { EditExamAlert } from "./EditExamAlert";
@@ -20,12 +21,14 @@ import { EditExamSchedule } from "./EditExamSchedule";
 import { PDFGenerator } from "./PDFGenerator";
 import { StaffManagement } from "./StaffManagement";
 import { SubjectManagement } from "./SubjectManagement";
+import { ExamScheduleTable } from "./ExamScheduleTable";
 
 import { examService } from "../services/examService";
 
 export const AdminDashboard: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [alerts, setAlerts] = useState<ExamAlert[]>([]);
+  const [scheduledExams, setScheduledExams] = useState<any[]>([]);
   // Separate alerts by year (must be after alerts state is defined)
   const alertsYear1 = alerts.filter((a) => a.year === 1);
   const alertsYear2 = alerts.filter((a) => a.year === 2);
@@ -43,6 +46,21 @@ export const AdminDashboard: React.FC = () => {
     };
     fetchSubjects();
   }, []);
+  
+  // Fetch scheduled exams
+  const fetchScheduledExams = async () => {
+    try {
+      const exams = await examService.getScheduledExams();
+      setScheduledExams(exams);
+    } catch (err) {
+      console.error("Failed to fetch scheduled exams:", err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchScheduledExams();
+  }, []);
+
   const { user, logout } = useAuth();
   const { exams } = useExams();
   const [activeTab, setActiveTab] = useState<
@@ -92,8 +110,7 @@ export const AdminDashboard: React.FC = () => {
   const handleUpdateSchedule = async () => {
     // Refresh scheduled exams data from the database
     try {
-      // This will trigger a re-render with updated data
-      // The useExams context should handle the refresh
+      await fetchScheduledExams();
       setEditingSchedule(null);
     } catch (error) {
       console.error("Error refreshing schedule data:", error);
@@ -700,6 +717,14 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               {/* Content Sections */}
+              {/* Exam Schedule Overview */}
+              <div className="w-full mt-8">
+                <ExamScheduleTable 
+                  exams={exams}
+                  scheduledExams={scheduledExams}
+                  onScheduleUpdated={fetchScheduledExams}
+                />
+              </div>
               {/* Department Overview removed as requested */}
             </div>
           )}

@@ -11,6 +11,7 @@ import {
   Download,
 } from "lucide-react";
 import {CreateSubjectData, subjectService, Subject} from "../services/subjectService";
+import { departmentService, Department } from "../services/departmentService";
 import {examService} from "../services/examService";
 
 interface SubjectWithSchedule extends Subject {
@@ -45,6 +46,12 @@ export const SubjectManagement: React.FC = () => {
     semester: 1,
     department: ""
   });
+  const [applyToAllDepartments, setApplyToAllDepartments] = useState(false);
+  const [applyToSpecificDepartments, setApplyToSpecificDepartments] = useState(false);
+  const [departmentsList, setDepartmentsList] = useState<Department[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [deptCodeOverrides, setDeptCodeOverrides] = useState<Record<string, string>>({});
+  const [deptSearchTerm, setDeptSearchTerm] = useState("");
 
   // Get unique years and semesters from subjects
   const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))].sort();
@@ -93,6 +100,36 @@ export const SubjectManagement: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedYear]);
+
+  // Keep Add-Form semester in sync with Add-Form year selection
+  useEffect(() => {
+    const allowed =
+      newSubject.year === 1
+        ? [1, 2]
+        : newSubject.year === 2
+        ? [3, 4]
+        : newSubject.year === 3
+        ? [5, 6]
+        : [7, 8];
+    if (!allowed.includes(newSubject.semester)) {
+      setNewSubject((prev) => ({ ...prev, semester: allowed[0] }));
+    }
+  }, [newSubject.year]);
+
+  // Load departments when Add Subject form is shown
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        if (showAddForm) {
+          const deps = await departmentService.getAllDepartments();
+          setDepartmentsList(deps);
+        }
+      } catch (e) {
+        console.error("Failed to load departments", e);
+      }
+    };
+    fetchDepartments();
+  }, [showAddForm]);
 
   const loadSubjects = async () => {
     try {
@@ -421,7 +458,72 @@ export const SubjectManagement: React.FC = () => {
   const handleAddSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await subjectService.createSubject(newSubject);
+      // Load existing subjects once for duplicate prevention
+      const existing = await subjectService.getAllSubjects();
+      const existingSet = new Set(
+        existing.map(
+          (s) => `${s.department}__${s.year}__${s.semester}__${s.subcode}`.toLowerCase()
+        )
+      );
+
+      if (applyToAllDepartments) {
+        const departments = await departmentService.getAllDepartments();
+        let subjectsPayload: CreateSubjectData[] = departments.map((d) => ({
+          subcode: newSubject.subcode,
+          name: newSubject.name,
+          year: newSubject.year,
+          semester: newSubject.semester,
+          department: d.name,
+          is_shared: true,
+        }));
+        // Deduplicate
+        const before = subjectsPayload.length;
+        subjectsPayload = subjectsPayload.filter(
+          (p) => !existingSet.has(`${p.department}__${p.year}__${p.semester}__${p.subcode}`.toLowerCase())
+        );
+        if (subjectsPayload.length === 0) {
+          alert("All selected subjects already exist for the chosen criteria.");
+          return;
+        }
+        if (subjectsPayload.length < before) {
+          alert(`${before - subjectsPayload.length} duplicate(s) were skipped.`);
+        }
+        await subjectService.bulkCreateSubjects(subjectsPayload);
+      } else if (applyToSpecificDepartments) {
+        if (selectedDepartments.length === 0) {
+          alert("Please select at least one department.");
+          return;
+        }
+        let payload: CreateSubjectData[] = selectedDepartments
+          .map((depId) => {
+            const dep = departmentsList.find((d) => d.id === depId);
+            if (!dep) return null;
+            const overrideCode = deptCodeOverrides[depId]?.trim();
+            return {
+              subcode: overrideCode && overrideCode.length > 0 ? overrideCode : newSubject.subcode,
+              name: newSubject.name,
+              year: newSubject.year,
+              semester: newSubject.semester,
+              department: dep.name,
+              is_shared: true,
+            } as CreateSubjectData;
+          })
+          .filter((x): x is CreateSubjectData => x !== null);
+        const before = payload.length;
+        payload = payload.filter(
+          (p) => !existingSet.has(`${p.department}__${p.year}__${p.semester}__${p.subcode}`.toLowerCase())
+        );
+        if (payload.length === 0) {
+          alert("All selected subjects already exist for the chosen criteria.");
+          return;
+        }
+        if (payload.length < before) {
+          alert(`${before - payload.length} duplicate(s) were skipped.`);
+        }
+        await subjectService.bulkCreateSubjects(payload);
+      } else {
+        await subjectService.createSubject(newSubject as CreateSubjectData);
+      }
       setShowAddForm(false);
       setNewSubject({
         subcode: "",
@@ -430,12 +532,26 @@ export const SubjectManagement: React.FC = () => {
         semester: 1,
         department: ""
       });
+      setApplyToAllDepartments(false);
+      setApplyToSpecificDepartments(false);
+      setSelectedDepartments([]);
+      setDeptCodeOverrides({});
       await loadSubjects(); // Refresh the list
     } catch (error) {
       console.error("Error adding subject:", error);
       alert("Failed to add subject. Please try again.");
     }
   };
+
+  // Allowed semesters for the Add Subject form based on chosen year
+  const formAllowedSemesters: number[] =
+    newSubject.year === 1
+      ? [1, 2]
+      : newSubject.year === 2
+      ? [3, 4]
+      : newSubject.year === 3
+      ? [5, 6]
+      : [7, 8];
 
   return (
     <div className="space-y-6">
@@ -516,7 +632,7 @@ export const SubjectManagement: React.FC = () => {
                   onChange={(e) => setNewSubject({ ...newSubject, semester: parseInt(e.target.value) })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                  {formAllowedSemesters.map((sem) => (
                     <option key={sem} value={sem}>Semester {sem}</option>
                   ))}
                 </select>
@@ -525,11 +641,136 @@ export const SubjectManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">Department</label>
                 <input
                   type="text"
-                  required
+                  required={!applyToAllDepartments && !applyToSpecificDepartments}
+                  disabled={applyToAllDepartments || applyToSpecificDepartments}
                   value={newSubject.department}
                   onChange={(e) => setNewSubject({ ...newSubject, department: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
+                <div className="mt-2 flex items-center">
+                  <input
+                    id="applyAllDeps"
+                    type="checkbox"
+                    checked={applyToAllDepartments}
+                    onChange={(e) => {
+                      setApplyToAllDepartments(e.target.checked);
+                      if (e.target.checked) {
+                        setApplyToSpecificDepartments(false);
+                      }
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <label htmlFor="applyAllDeps" className="ml-2 text-sm text-gray-700">
+                    Apply to all departments
+                  </label>
+                </div>
+                <div className="mt-2 flex items-center">
+                  <input
+                    id="applySpecificDeps"
+                    type="checkbox"
+                    checked={applyToSpecificDepartments}
+                    onChange={(e) => {
+                      setApplyToSpecificDepartments(e.target.checked);
+                      if (e.target.checked) {
+                        setApplyToAllDepartments(false);
+                      } else {
+                        setSelectedDepartments([]);
+                        setDeptCodeOverrides({});
+                      }
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <label htmlFor="applySpecificDeps" className="ml-2 text-sm text-gray-700">
+                    Apply to specific departments
+                  </label>
+                </div>
+                {applyToSpecificDepartments && (
+                  <div className="mt-3 border rounded-md p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <input
+                        type="text"
+                        value={deptSearchTerm}
+                        onChange={(e) => setDeptSearchTerm(e.target.value)}
+                        placeholder="Search departments..."
+                        className="block w-1/2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      />
+                      <div className="space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const filtered = departmentsList.filter((d) =>
+                              (d.name + " " + (d.code || "")).toLowerCase().includes(deptSearchTerm.toLowerCase())
+                            );
+                            setSelectedDepartments((prev) => {
+                              const ids = new Set(prev);
+                              filtered.forEach((d) => ids.add(d.id));
+                              return Array.from(ids);
+                            });
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDepartments([])}
+                          className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-56 overflow-auto space-y-2">
+                      {departmentsList
+                        .filter((dep) =>
+                          (dep.name + " " + (dep.code || "")).toLowerCase().includes(deptSearchTerm.toLowerCase())
+                        )
+                        .map((dep) => {
+                      const checked = selectedDepartments.includes(dep.id);
+                      return (
+                        <div key={dep.id} className="space-y-1">
+                          <div className="flex items-center">
+                            <input
+                              id={`dep-${dep.id}`}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedDepartments((prev) => [...prev, dep.id]);
+                                } else {
+                                  setSelectedDepartments((prev) => prev.filter((id) => id !== dep.id));
+                                  setDeptCodeOverrides((prev) => {
+                                    const { [dep.id]: _, ...rest } = prev;
+                                    return rest;
+                                  });
+                                }
+                              }}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`dep-${dep.id}`} className="ml-2 text-sm text-gray-700">
+                              {dep.name}
+                            </label>
+                          </div>
+                          {checked && (
+                            <div className="ml-6 border border-gray-300 rounded-md p-3 bg-white">
+                              <label className="block text-xs font-medium text-gray-700">Override subject code (optional)</label>
+                              <input
+                                type="text"
+                                value={deptCodeOverrides[dep.id] || ""}
+                                onChange={(e) =>
+                                  setDeptCodeOverrides((prev) => ({ ...prev, [dep.id]: e.target.value }))
+                                }
+                                placeholder={newSubject.subcode}
+                                className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
