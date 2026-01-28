@@ -400,13 +400,30 @@ export const examService = {
       }
 
       // Check if the same subject (by name OR code) is already scheduled
+      const isCN = ((staffData.subject_name || "").toLowerCase().includes("cn") ||
+                     (staffData.subject_code || "").toLowerCase().includes("cn"));
+
       const sameSubjectSchedules =
-        existingSchedules?.filter(
-          (schedule) => 
-            schedule.subject_detail &&
-            (schedule.subject_detail.name === staffData.subject_name ||
-             schedule.subject_detail.subcode === staffData.subject_code)
-        ) || [];
+        existingSchedules?.filter((schedule) => {
+          if (!schedule.subject_detail) return false;
+          const name = (schedule.subject_detail.name || "").toLowerCase();
+          const code = (schedule.subject_detail.subcode || "").toLowerCase();
+
+          // Exact match by name or code
+          if (
+            schedule.subject_detail.name === staffData.subject_name ||
+            schedule.subject_detail.subcode === staffData.subject_code
+          ) {
+            return true;
+          }
+
+          // Special case: any subject containing "cn" should be treated as the same subject
+          if (isCN && (name.includes("cn") || code.includes("cn"))) {
+            return true;
+          }
+
+          return false;
+        }) || [];
 
       if (sameSubjectSchedules.length > 0) {
         // If the subject is already scheduled, force it to be on the same date
@@ -480,13 +497,29 @@ export const examService = {
         throw new Error(`Department not found: ${trimmedDepartment}`);
       }
 
-      // Find other departments teaching the same subject (by code AND name)
-      const { data: otherDeptSubjects, error: otherDeptError } = await supabase
-        .from("subject_detail")
-        .select("*")
-        .eq("subcode", staffData.subject_code)
-        .eq("name", staffData.subject_name)
-        .neq("department", staffData.department);
+      // Find other departments teaching the same subject. Match by name OR code.
+      let otherDeptSubjects: any = [];
+      let otherDeptError: any = null;
+
+      if (isCN) {
+        const cnPattern = "%cn%"; // case-insensitive match
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.ilike.${cnPattern},subcode.ilike.${cnPattern}`)
+          .neq("department", staffData.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      } else {
+        // Match by name OR code (not necessarily both)
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.eq.${staffData.subject_name},subcode.eq.${staffData.subject_code}`)
+          .neq("department", staffData.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      }
 
       // Get department IDs for the other departments
       const departmentIds: { [dept: string]: string } = {};
@@ -633,13 +666,30 @@ export const examService = {
       }
 
       // Check if the same subject (by name OR code) is already scheduled in another department
+      const isCN = ((subject.name || "").toLowerCase().includes("cn") ||
+                     (subject.subcode || "").toLowerCase().includes("cn"));
+
       const sameSubjectSchedules =
-        existingSchedules?.filter(
-          (schedule) => 
-            schedule.subject_detail &&
-            (schedule.subject_detail.name === subject.name || 
-             schedule.subject_detail.subcode === subject.subcode)
-        ) || [];
+        existingSchedules?.filter((schedule) => {
+          if (!schedule.subject_detail) return false;
+          const name = (schedule.subject_detail.name || "").toLowerCase();
+          const code = (schedule.subject_detail.subcode || "").toLowerCase();
+
+          // Exact match by name or code
+          if (
+            schedule.subject_detail.name === subject.name ||
+            schedule.subject_detail.subcode === subject.subcode
+          ) {
+            return true;
+          }
+
+          // Special case: any subject containing "cn" should be treated as the same subject
+          if (isCN && (name.includes("cn") || code.includes("cn"))) {
+            return true;
+          }
+
+          return false;
+        }) || [];
 
       if (sameSubjectSchedules.length > 0) {
         // If the subject is already scheduled, force it to be on the same date
@@ -655,14 +705,31 @@ export const examService = {
         }
       }
 
-      // Find other departments teaching the same subject (by name AND code)
-      const { data: otherDeptSubjects, error: otherDeptError } = await supabase
-        .from("subject_detail")
-        .select("*")
-        .eq("subcode", subject.subcode)
-        .eq("name", subject.name)
-        .eq("year", subject.year)
-        .neq("department", subject.department);
+      // Find other departments teaching the same subject (by name AND code). For CN subjects, match by substring (case-insensitive).
+      let otherDeptSubjects: any = [];
+      let otherDeptError: any = null;
+
+      if (isCN) {
+        const cnPattern = "%cn%";
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.ilike.${cnPattern},subcode.ilike.${cnPattern}`)
+          .eq("year", subject.year)
+          .neq("department", subject.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      } else {
+        // Match by name OR code (not necessarily both), same year
+        const { data: other, error } = await supabase
+          .from("subject_detail")
+          .select("*")
+          .or(`name.eq.${subject.name},subcode.eq.${subject.subcode}`)
+          .eq("year", subject.year)
+          .neq("department", subject.department);
+        otherDeptSubjects = other;
+        otherDeptError = error;
+      }
 
       if (otherDeptError) {
         throw new Error(otherDeptError.message);
