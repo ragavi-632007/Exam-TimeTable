@@ -985,189 +985,162 @@ export const examService = {
 
       const subject = currentExam.subject_detail;
       const oldDate = currentExam.exam_date;
+      const departmentId = currentExam.department_id;
 
-      // Check if the same subject is scheduled elsewhere (by name OR code)
-      const { data: sameSubjectSchedules, error: sameSubjectError } = await supabase
-        .from("exam_schedules")
-        .select(`
-          *,
-          subject_detail(*),
-          departments!exam_schedules_department_id_fkey(*)
-        `)
-        .neq("id", scheduleId);
+      // Convert dates to numbers for comparison (number of days since epoch)
+      const dateToNumber = (dateStr: string) => new Date(dateStr).getTime();
+      const oldDateNum = dateToNumber(oldDate);
+      const newDateNum = dateToNumber(updates.exam_date);
 
-      if (sameSubjectError) {
-        throw new Error(sameSubjectError.message);
-      }
+      // Determine if moving forward (push up) or backward (push down)
+      const isMovingForward = newDateNum > oldDateNum; // Moving to a later date
+      const isMovingBackward = newDateNum < oldDateNum; // Moving to an earlier date
 
-      // Find other departments with same subject (by name OR code)
-      const otherDeptSameSubject = sameSubjectSchedules?.filter(
-        (schedule) => 
-          schedule.subject_detail &&
-          (schedule.subject_detail.name === subject.name || 
-           schedule.subject_detail.subcode === subject.subcode) &&
-          schedule.subject_detail.id !== subject.id
-      ) || [];
+      // Helper function to add days to a date string
+      const addDays = (dateStr: string, days: number): string => {
+        const date = new Date(dateStr);
+        date.setDate(date.getDate() + days);
+        return date.toISOString().split('T')[0];
+      };
 
-      // If same subject exists elsewhere, update them to the new date as well
-      if (otherDeptSameSubject.length > 0) {
-        for (const otherSchedule of otherDeptSameSubject) {
-          // Check for conflicts on the new date within this department
-          const { data: conflictExamsOtherDept, error: conflictErrorOtherDept } = await supabase
-            .from("exam_schedules")
-            .select(`
-              *,
-              subject_detail(*)
-            `)
-            .eq("exam_date", updates.exam_date)
-            .eq("department_id", otherSchedule.department_id)
-            .neq("id", otherSchedule.id);
-
-          if (conflictErrorOtherDept) {
-            console.error(`Failed to check conflicts for department ${otherSchedule.department_id}:`, conflictErrorOtherDept);
-          }
-
-          // If there's a conflict in this department, swap it to the old date
-          if (conflictExamsOtherDept && conflictExamsOtherDept.length > 0) {
-            const conflictExamOtherDept = conflictExamsOtherDept[0];
-            const conflictSubject = conflictExamOtherDept.subject_detail;
-
-            // First, update this conflicting exam to the old date
-            const { error: swapErrorOtherDept } = await supabase
-              .from("exam_schedules")
-              .update({ exam_date: oldDate })
-              .eq("id", conflictExamOtherDept.id);
-
-            if (swapErrorOtherDept) {
-              console.error(`Failed to swap conflict ${conflictExamOtherDept.id}:`, swapErrorOtherDept);
-            } else {
-              console.log(`Swapped conflict: ${conflictExamOtherDept.id} moved to ${oldDate}`);
-            }
-
-            // Check if the swapped subject is also a common subject (taught by other departments)
-            const { data: swappedSubjectOtherDepts, error: swappedError } = await supabase
-              .from("exam_schedules")
-              .select(`
-                *,
-                subject_detail(*)
-              `)
-              .neq("id", conflictExamOtherDept.id);
-
-            if (!swappedError && swappedSubjectOtherDepts) {
-              const otherDeptsWithSwappedSubject = swappedSubjectOtherDepts.filter(
-                (schedule) =>
-                  schedule.subject_detail &&
-                  (schedule.subject_detail.name === conflictSubject.name ||
-                   schedule.subject_detail.subcode === conflictSubject.subcode) &&
-                  schedule.subject_detail.id !== conflictSubject.id
-              );
-
-              // Update all other departments with the swapped subject to the old date as well
-              for (const swappedSchedule of otherDeptsWithSwappedSubject) {
-                const { error: updateSwappedError } = await supabase
-                  .from("exam_schedules")
-                  .update({ exam_date: oldDate })
-                  .eq("id", swappedSchedule.id);
-
-                if (updateSwappedError) {
-                  console.error(`Failed to update swapped subject ${swappedSchedule.id}:`, updateSwappedError);
-                } else {
-                  console.log(`Updated swapped subject ${swappedSchedule.id} for ${swappedSchedule.subject_detail.name} to date ${oldDate}`);
-                }
-              }
-            }
-          }
-
-          // Now update this department's schedule to the new date
-          const { error: updateOtherError } = await supabase
-            .from("exam_schedules")
-            .update({ exam_date: updates.exam_date })
-            .eq("id", otherSchedule.id);
-
-          if (updateOtherError) {
-            console.error(`Failed to update exam ${otherSchedule.id} to new date:`, updateOtherError);
-          } else {
-            console.log(`Updated exam ${otherSchedule.id} for ${otherSchedule.subject_detail.name} to date ${updates.exam_date}`);
-          }
-        }
-      }
-
-      // Check for conflicts on the new date within the same department
-      const { data: conflictExams, error: conflictError } = await supabase
+      // Step 1: Find all instances of this common subject across all departments for the same year
+      const { data: allSubjectsSchedules, error: allSubjectsError } = await supabase
         .from("exam_schedules")
         .select(`
           *,
           subject_detail(*)
         `)
-        .eq("exam_date", updates.exam_date)
-        .eq("department_id", currentExam.department_id)
         .neq("id", scheduleId);
 
-      if (conflictError) {
-        throw new Error(conflictError.message);
+      if (allSubjectsError) {
+        throw new Error(allSubjectsError.message);
       }
 
-      if (conflictExams && conflictExams.length > 0) {
-        // Found a conflict in the same department, perform the swap
-        const conflictExam = conflictExams[0];
+      // Find all departments with the same subject (by NAME for common subjects)
+      const sameSubjectAcrossDepts = (allSubjectsSchedules || []).filter(
+        (schedule) => 
+          schedule.subject_detail &&
+          schedule.subject_detail.name === subject.name &&  // MATCH BY NAME (common subjects have same name, different codes)
+          schedule.subject_detail.year === subject.year &&  // SAME YEAR
+          schedule.subject_detail.semester === subject.semester &&  // SAME SEMESTER
+          schedule.subject_detail.id !== subject.id  // Different subject record
+      );
 
-        // Update the conflicting exam to take the current exam's old date
-        const { error: swapError } = await supabase
+      console.log(`Found ${sameSubjectAcrossDepts.length} other instances of subject "${subject.name}" (Year: ${subject.year}, Sem: ${subject.semester}) across departments`);
+
+      // PRIORITY STEP 1: Update all instances of the common subject to the new date FIRST
+      console.log(`FIRST: Moving all ${sameSubjectAcrossDepts.length} instances of subject "${subject.name}" to date ${updates.exam_date}`);
+      for (const otherSchedule of sameSubjectAcrossDepts) {
+        console.log(`  Moving subject "${subject.name}" in department ${otherSchedule.department_id} from ${otherSchedule.exam_date} to ${updates.exam_date}`);
+        const { error: updateError } = await supabase
           .from("exam_schedules")
-          .update({ exam_date: oldDate })
-          .eq("id", conflictExam.id);
+          .update({ exam_date: updates.exam_date })
+          .eq("id", otherSchedule.id);
 
-        if (swapError) {
-          throw new Error(swapError.message);
+        if (updateError) {
+          console.error(`Failed to update exam ${otherSchedule.id}:`, updateError);
+          throw new Error(`Failed to update exam: ${updateError.message}`);
         }
-
-        console.log(`Swapped exam schedules: ${scheduleId} -> ${updates.exam_date}, ${conflictExam.id} -> ${oldDate}`);
       }
 
-      // If this subject is being moved to a different date, release (delete) schedules for the same subject on the old date in ALL departments
-      if (oldDate !== updates.exam_date) {
-        const { data: schedulesToRelease, error: releaseError } = await supabase
-          .from("exam_schedules")
-          .select(`
-            *,
-            subject_detail(*)
-          `)
-          .eq("exam_date", oldDate)
-          .neq("id", scheduleId);
+      // Update the current/original schedule to the new date
+      const { error: updateOriginalError } = await supabase
+        .from("exam_schedules")
+        .update(updateData)
+        .eq("id", scheduleId);
+      
+      if (updateOriginalError) {
+        throw new Error(updateOriginalError.message);
+      }
 
-        if (releaseError) {
-          throw new Error(releaseError.message);
+      console.log(`Original subject "${subject.name}" in department ${departmentId} moved to ${updates.exam_date}`);
+
+      // PRIORITY STEP 2: Cascade in ALL departments (not just ones that have the subject being moved)
+      // Get all unique departments from exam_schedules for this year/semester
+      const { data: allExamDepts, error: allDeptError } = await supabase
+        .from("exam_schedules")
+        .select(`
+          department_id,
+          subject_detail(year, semester)
+        `)
+        .eq("subject_detail.year", subject.year)
+        .eq("subject_detail.semester", subject.semester);
+
+      if (allDeptError) {
+        console.error("Error fetching all departments:", allDeptError);
+      }
+
+      const uniqueDeps = [...new Set((allExamDepts || []).map(e => e.department_id))];
+
+      console.log(`SECOND: Processing cascading shifts in ${uniqueDeps.length} departments for Year ${subject.year}, Semester ${subject.semester}`);
+
+      for (const deptId of uniqueDeps) {
+        const { data: allExamsInDept2, error: allExamsError2 } = await supabase
+          .from("exam_schedules")
+          .select(`*,subject_detail(*)`)
+          .eq("department_id", deptId);
+
+        if (allExamsError2) {
+          console.error(`Failed to fetch exams for department ${deptId}:`, allExamsError2);
+          continue;
         }
 
-        // Find and delete schedules for the same subject on the old date (other departments)
-        for (const scheduleToRelease of schedulesToRelease || []) {
-          if (
-            scheduleToRelease.subject_detail &&
-            (scheduleToRelease.subject_detail.name === subject.name ||
-             scheduleToRelease.subject_detail.subcode === subject.subcode) &&
-            scheduleToRelease.subject_detail.id !== subject.id
-          ) {
-            const { error: deleteError } = await supabase
-              .from("exam_schedules")
-              .delete()
-              .eq("id", scheduleToRelease.id);
+        const sortedExams2 = (allExamsInDept2 || []).sort(
+          (a, b) => dateToNumber(a.exam_date) - dateToNumber(b.exam_date)
+        );
 
-            if (deleteError) {
-              console.error(`Failed to release exam ${scheduleToRelease.id}:`, deleteError);
-            } else {
-              console.log(`Released exam schedule ${scheduleToRelease.id} for ${scheduleToRelease.subject_detail.name} in department ${scheduleToRelease.department_id}`);
+        let examsToShift2: any[] = [];
+
+        if (isMovingForward) {
+          examsToShift2 = sortedExams2.filter(exam => {
+            const examDateNum = dateToNumber(exam.exam_date);
+            const isSameSubject = exam.subject_detail &&
+              exam.subject_detail.name === subject.name &&
+              exam.subject_detail.year === subject.year &&
+              exam.subject_detail.semester === subject.semester;
+            return !isSameSubject && examDateNum > oldDateNum && examDateNum < newDateNum;
+          });
+        } else if (isMovingBackward) {
+          examsToShift2 = sortedExams2.filter(exam => {
+            const examDateNum = dateToNumber(exam.exam_date);
+            const isSameSubject = exam.subject_detail &&
+              exam.subject_detail.name === subject.name &&
+              exam.subject_detail.year === subject.year &&
+              exam.subject_detail.semester === subject.semester;
+            return !isSameSubject && examDateNum >= newDateNum && examDateNum < oldDateNum;
+          });
+        }
+
+        if (examsToShift2.length > 0) {
+          if (isMovingForward) {
+            for (const exam of examsToShift2.reverse()) {
+              const nd = addDays(exam.exam_date, -1);
+              console.log(`  Cascading down: ${exam.subject_detail?.name} from ${exam.exam_date} to ${nd}`);
+              const { error: shiftError } = await supabase
+                .from("exam_schedules")
+                .update({ exam_date: nd })
+                .eq("id", exam.id);
+
+              if (shiftError) {
+                console.error(`Failed to shift exam ${exam.id}:`, shiftError);
+              }
+            }
+          } else if (isMovingBackward) {
+            for (const exam of examsToShift2) {
+              const nd = addDays(exam.exam_date, 1);
+              console.log(`  Cascading up: ${exam.subject_detail?.name} from ${exam.exam_date} to ${nd}`);
+              const { error: shiftError } = await supabase
+                .from("exam_schedules")
+                .update({ exam_date: nd })
+                .eq("id", exam.id);
+
+              if (shiftError) {
+                console.error(`Failed to shift exam ${exam.id}:`, shiftError);
+              }
             }
           }
         }
       }
-    }
-
-    const { error } = await supabase
-      .from("exam_schedules")
-      .update(updateData)
-      .eq("id", scheduleId);
-    if (error) {
-      throw new Error(error.message);
     }
   },
 
